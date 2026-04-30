@@ -47,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
         WorkerTask.taskName,
         frequency: const Duration(hours: 1),
         constraints: Constraints(networkType: NetworkType.connected),
-        existingWorkPolicy: ExistingWorkPolicy.replace,
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
       );
     } else {
       await Workmanager().cancelByUniqueName(WorkerTask.taskName);

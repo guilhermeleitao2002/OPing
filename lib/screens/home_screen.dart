@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'package:oping/models/chapter.dart';
 import 'package:oping/services/chapter_storage_service.dart';
@@ -19,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _lastChecked;
   bool _isLoading = true;
   bool _isChecking = false;
+  bool _pollingEnabled = true;
   String? _errorMessage;
 
   final _mangaDex = MangaDexService();
@@ -29,6 +31,28 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _requestNotificationPermission();
     _loadData();
+    _loadPollingState();
+  }
+
+  Future<void> _loadPollingState() async {
+    final enabled = await _storage.getPollingEnabled();
+    if (mounted) setState(() => _pollingEnabled = enabled);
+  }
+
+  Future<void> _setPollingEnabled(bool enabled) async {
+    await _storage.savePollingEnabled(enabled);
+    if (enabled) {
+      await Workmanager().registerPeriodicTask(
+        WorkerTask.taskName,
+        WorkerTask.taskName,
+        frequency: const Duration(hours: 1),
+        constraints: Constraints(networkType: NetworkType.connected),
+        existingWorkPolicy: ExistingWorkPolicy.replace,
+      );
+    } else {
+      await Workmanager().cancelByUniqueName(WorkerTask.taskName);
+    }
+    if (mounted) setState(() => _pollingEnabled = enabled);
   }
 
   Future<void> _requestNotificationPermission() async {
@@ -152,6 +176,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (_errorMessage != null) _buildErrorCard(theme) else if (_latestChapter != null) ChapterCard(chapter: _latestChapter!),
         const SizedBox(height: 12),
         _buildLastChecked(theme),
+        const SizedBox(height: 16),
+        _buildPollingToggle(theme),
         const SizedBox(height: 80),
       ],
     );
@@ -209,6 +235,24 @@ class _HomeScreenState extends State<HomeScreen> {
         color: theme.colorScheme.onSurfaceVariant,
       ),
       textAlign: TextAlign.center,
+    );
+  }
+
+  Widget _buildPollingToggle(ThemeData theme) {
+    return Card(
+      child: SwitchListTile(
+        title: const Text('Background polling'),
+        subtitle: Text(
+          _pollingEnabled ? 'Checks for new chapters every hour' : 'Notifications paused',
+          style: theme.textTheme.bodySmall,
+        ),
+        secondary: Icon(
+          _pollingEnabled ? Icons.notifications_active : Icons.notifications_off,
+          color: _pollingEnabled ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+        ),
+        value: _pollingEnabled,
+        onChanged: _setPollingEnabled,
+      ),
     );
   }
 

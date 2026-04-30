@@ -45,6 +45,7 @@ app.*.map.json
 /android/app/release
 
 local.properties
+devtools_options.yaml
 
 # Signing secrets — never commit
 android/key.properties

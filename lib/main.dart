@@ -8,17 +8,27 @@ import 'package:oping/workers/chapter_check_worker.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await NotificationService().initialize();
+  // Each init step is isolated so a failure in one doesn't prevent the app
+  // from launching. The UI degrades gracefully: notifications or background
+  // polling may be unavailable, but the screen always renders.
+  try {
+    await NotificationService().initialize();
+  } catch (e, st) {
+    FlutterError.reportError(FlutterErrorDetails(exception: e, stack: st));
+  }
 
-  await Workmanager().initialize(callbackDispatcher);
-
-  await Workmanager().registerPeriodicTask(
-    WorkerTask.taskName,
-    WorkerTask.taskName,
-    frequency: const Duration(hours: 1),
-    constraints: Constraints(networkType: NetworkType.connected),
-    existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
-  );
+  try {
+    await Workmanager().initialize(callbackDispatcher);
+    await Workmanager().registerPeriodicTask(
+      WorkerTask.taskName,
+      WorkerTask.taskName,
+      frequency: const Duration(hours: 1),
+      constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+    );
+  } catch (e, st) {
+    FlutterError.reportError(FlutterErrorDetails(exception: e, stack: st));
+  }
 
   runApp(const OPingApp());
 }

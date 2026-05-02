@@ -221,6 +221,11 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
         _results = results;
         _errorMessage = results.isEmpty ? 'No results for "$_activeQuery"' : null;
       });
+    } else {
+      setState(() => _isLoadingPopular = true);
+      final results = await _mangaDex.fetchPopularManga(sort: sort);
+      if (!mounted) return;
+      setState(() { _popular = results; _isLoadingPopular = false; });
     }
   }
 
@@ -301,7 +306,7 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_activeQuery.isNotEmpty) _FilterChips(
+                  _FilterChips(
                     selected: _sort,
                     onChanged: _changeSort,
                   ),

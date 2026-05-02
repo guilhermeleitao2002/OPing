@@ -55,11 +55,14 @@ class MangaDexService {
     }
   }
 
-  Future<List<Manga>> fetchPopularManga({int limit = 18}) async {
+  Future<List<Manga>> fetchPopularManga({
+    int limit = 18,
+    MangaSortOrder sort = MangaSortOrder.mostFollowed,
+  }) async {
     try {
       final params = <String, List<String>>{
         'limit': [limit.clamp(1, 100).toString()],
-        'order[followedCount]': ['desc'],
+        ...sort.queryParams,
         'contentRating[]': ['safe', 'suggestive', 'erotica'],
         'includes[]': ['cover_art'],
         'hasAvailableChapters': ['true'],

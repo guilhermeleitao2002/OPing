@@ -53,9 +53,15 @@ class MockMangaDexService extends _i1.Mock implements _i2.MangaDexService {
           as _i3.Future<List<_i4.Manga>>);
 
   @override
-  _i3.Future<List<_i4.Manga>> fetchPopularManga({int? limit = 18}) =>
+  _i3.Future<List<_i4.Manga>> fetchPopularManga({
+    int? limit = 18,
+    _i2.MangaSortOrder? sort = _i2.MangaSortOrder.mostFollowed,
+  }) =>
       (super.noSuchMethod(
-            Invocation.method(#fetchPopularManga, [], {#limit: limit}),
+            Invocation.method(#fetchPopularManga, [], {
+              #limit: limit,
+              #sort: sort,
+            }),
             returnValue: _i3.Future<List<_i4.Manga>>.value(<_i4.Manga>[]),
           )
           as _i3.Future<List<_i4.Manga>>);

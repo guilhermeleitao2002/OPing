@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:oping/models/app_language.dart';
 import 'package:oping/models/chapter.dart';
 import 'package:oping/screens/chapter_reader_screen.dart';
+import 'package:oping/services/chapter_storage_service.dart';
 import 'package:oping/services/manga_dex_service.dart';
 import 'package:oping/services/tracked_manga_service.dart';
 
@@ -19,6 +21,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   static const int _pageSize = 100;
 
   final _mangaDex = MangaDexService();
+  final _storage = ChapterStorageService();
   final _scrollController = ScrollController();
 
   final List<Chapter> _chapters = [];
@@ -27,19 +30,30 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   bool _isLoadingMore = false;
   bool _hasInitialError = false;
 
+  String _preferredLanguage = 'en';
+  String? _overrideLanguage;
+  List<String> _availableLanguages = [];
+
+  String get _effectiveLanguage => _overrideLanguage ?? _preferredLanguage;
+
   bool get _hasMore => _chapters.length < _total;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _loadInitial();
+    _init();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _init() async {
+    _preferredLanguage = await _storage.getPreferredLanguage();
+    _loadInitial();
   }
 
   void _onScroll() {
@@ -57,14 +71,24 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
       _hasInitialError = false;
       _chapters.clear();
       _total = 0;
+      _availableLanguages = [];
     });
     final result = await _mangaDex.fetchChapterList(
-        widget.manga.id,
-        offset: 0,
-        limit: _pageSize);
+      widget.manga.id,
+      offset: 0,
+      limit: _pageSize,
+      language: _effectiveLanguage,
+    );
     if (!mounted) return;
     if (result == null) {
       setState(() { _isInitialLoading = false; _hasInitialError = true; });
+    } else if (result.total == 0) {
+      final langs = await _mangaDex.fetchAvailableLanguages(widget.manga.id);
+      if (!mounted) return;
+      setState(() {
+        _isInitialLoading = false;
+        _availableLanguages = langs.where((l) => l != _effectiveLanguage).toList();
+      });
     } else {
       setState(() {
         _isInitialLoading = false;
@@ -78,9 +102,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     if (_isLoadingMore || !_hasMore) return;
     setState(() => _isLoadingMore = true);
     final result = await _mangaDex.fetchChapterList(
-        widget.manga.id,
-        offset: _chapters.length,
-        limit: _pageSize);
+      widget.manga.id,
+      offset: _chapters.length,
+      limit: _pageSize,
+      language: _effectiveLanguage,
+    );
     if (!mounted) return;
     setState(() {
       _isLoadingMore = false;
@@ -89,6 +115,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         _total = result.total;
       }
     });
+  }
+
+  void _switchLanguage(String code) {
+    setState(() => _overrideLanguage = code);
+    _loadInitial();
   }
 
   Future<void> _openInBrowser() async {
@@ -151,36 +182,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
 
     if (_chapters.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.translate_rounded, size: 48,
-                color: theme.colorScheme.outlineVariant),
-            const SizedBox(height: 12),
-            Text('No English chapters found on MangaDex.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 6),
-            Text('The manga may use a different language or host chapters externally.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outlineVariant),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _openInBrowser,
-              icon: const Icon(Icons.open_in_browser, size: 16),
-              label: const Text('View on MangaDex'),
-            ),
-          ],
-        ),
-      );
+      return _buildEmptyLanguageState(theme);
     }
 
     return ListView.builder(
       controller: _scrollController,
-      itemCount: _chapters.length + 1, // +1 for header (or footer loading)
+      itemCount: _chapters.length + 1,
       itemBuilder: (_, i) {
         if (i == 0) return _buildHeader(theme);
         final idx = i - 1;
@@ -190,7 +197,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             mangaTitle: widget.manga.title,
           );
         }
-        // Footer: loading indicator or end-of-list
         return _isLoadingMore
             ? const Padding(
                 padding: EdgeInsets.all(16),
@@ -201,7 +207,65 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     );
   }
 
+  Widget _buildEmptyLanguageState(ThemeData theme) {
+    final currentLabel = AppLanguage.labelForCode(_effectiveLanguage);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.translate_rounded, size: 48,
+                color: theme.colorScheme.outlineVariant),
+            const SizedBox(height: 12),
+            Text(
+              'No $currentLabel chapters found.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            if (_availableLanguages.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Available languages:',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outlineVariant),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: _availableLanguages.map((code) {
+                  return ActionChip(
+                    label: Text(AppLanguage.labelForCode(code)),
+                    onPressed: () => _switchLanguage(code),
+                  );
+                }).toList(),
+              ),
+            ] else ...[
+              const SizedBox(height: 6),
+              Text(
+                'The manga may host chapters externally.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outlineVariant),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _openInBrowser,
+              icon: const Icon(Icons.open_in_browser, size: 16),
+              label: const Text('View on MangaDex'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader(ThemeData theme) {
+    final langLabel = AppLanguage.labelForCode(_effectiveLanguage);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
@@ -210,7 +274,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               size: 15, color: theme.colorScheme.primary),
           const SizedBox(width: 6),
           Text(
-            '$_total English ${_total == 1 ? 'chapter' : 'chapters'}',
+            '$_total $langLabel ${_total == 1 ? 'chapter' : 'chapters'}',
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,

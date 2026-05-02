@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:workmanager/workmanager.dart';
 
+import 'package:oping/models/app_language.dart';
 import 'package:oping/screens/chapter_list_screen.dart';
 import 'package:oping/screens/manga_search_screen.dart';
 import 'package:oping/services/chapter_storage_service.dart';
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isChecking = false;
   bool _pollingEnabled = true;
   int _pollIntervalMinutes = 60;
+  AppLanguage _preferredLanguage = AppLanguage.english;
 
   static const List<int> _intervalOptions = [15, 30, 60, 120, 180];
 
@@ -43,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _storage.getLastChecked(),
       _storage.getPollingEnabled(),
       _storage.getPollIntervalMinutes(),
+      _storage.getPreferredLanguage(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -50,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _lastChecked = results[1] as DateTime?;
       _pollingEnabled = results[2] as bool;
       _pollIntervalMinutes = results[3] as int;
+      _preferredLanguage = AppLanguage.fromCode(results[4] as String);
       _isLoading = false;
     });
   }
@@ -68,6 +72,11 @@ class _HomeScreenState extends State<HomeScreen> {
     await _storage.savePollIntervalMinutes(minutes);
     if (_pollingEnabled) await _registerPeriodicTask(minutes);
     if (mounted) setState(() => _pollIntervalMinutes = minutes);
+  }
+
+  Future<void> _setPreferredLanguage(AppLanguage lang) async {
+    await _storage.savePreferredLanguage(lang.code);
+    if (mounted) setState(() => _preferredLanguage = lang);
   }
 
   Future<void> _registerPeriodicTask(int intervalMinutes) =>
@@ -320,6 +329,28 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
           ],
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('Reading language', style: theme.textTheme.bodyMedium),
+                ),
+                DropdownButton<AppLanguage>(
+                  value: _preferredLanguage,
+                  underline: const SizedBox.shrink(),
+                  items: AppLanguage.values
+                      .map((l) => DropdownMenuItem(
+                            value: l,
+                            child: Text(l.label),
+                          ))
+                      .toList(),
+                  onChanged: (v) { if (v != null) _setPreferredLanguage(v); },
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

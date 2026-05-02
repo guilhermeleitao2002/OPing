@@ -43,8 +43,10 @@ class WorkerTask {
         return true;
       }
 
+      final language = await _storage.getPreferredLanguage();
       final latestById = await _mangaDex.fetchLatestChaptersFor(
         tracked.map((m) => m.id).toList(),
+        language: language,
       );
 
       final updates = <MangaUpdate>[];

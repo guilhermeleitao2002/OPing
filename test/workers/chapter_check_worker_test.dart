@@ -47,6 +47,7 @@ void main() {
 
     when(mockNotifications.initialize()).thenAnswer((_) => Future.value());
     when(mockStorage.markChecked()).thenAnswer((_) => Future.value());
+    when(mockStorage.getPreferredLanguage()).thenAnswer((_) async => 'en');
     when(mockTracked.updateLastSeen(any, any)).thenAnswer((_) => Future.value());
     when(mockNotifications.showNewChapterNotification(any, any))
         .thenAnswer((_) => Future.value());

@@ -37,9 +37,25 @@ class MockMangaDexService extends _i1.Mock implements _i2.MangaDexService {
   }
 
   @override
-  _i3.Future<List<_i4.Manga>> searchManga(String? query, {int? limit = 20}) =>
+  _i3.Future<List<_i4.Manga>> searchManga(
+    String? query, {
+    int? limit = 20,
+    _i2.MangaSortOrder? sort = _i2.MangaSortOrder.relevance,
+  }) =>
       (super.noSuchMethod(
-            Invocation.method(#searchManga, [query], {#limit: limit}),
+            Invocation.method(
+              #searchManga,
+              [query],
+              {#limit: limit, #sort: sort},
+            ),
+            returnValue: _i3.Future<List<_i4.Manga>>.value(<_i4.Manga>[]),
+          )
+          as _i3.Future<List<_i4.Manga>>);
+
+  @override
+  _i3.Future<List<_i4.Manga>> fetchPopularManga({int? limit = 18}) =>
+      (super.noSuchMethod(
+            Invocation.method(#fetchPopularManga, [], {#limit: limit}),
             returnValue: _i3.Future<List<_i4.Manga>>.value(<_i4.Manga>[]),
           )
           as _i3.Future<List<_i4.Manga>>);
@@ -95,6 +111,23 @@ class MockChapterStorageService extends _i1.Mock
   _i3.Future<void> savePollingEnabled(bool? enabled) =>
       (super.noSuchMethod(
             Invocation.method(#savePollingEnabled, [enabled]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  _i3.Future<int> getPollIntervalMinutes() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPollIntervalMinutes, []),
+            returnValue: _i3.Future<int>.value(0),
+          )
+          as _i3.Future<int>);
+
+  @override
+  _i3.Future<void> savePollIntervalMinutes(int? minutes) =>
+      (super.noSuchMethod(
+            Invocation.method(#savePollIntervalMinutes, [minutes]),
             returnValue: _i3.Future<void>.value(),
             returnValueForMissingStub: _i3.Future<void>.value(),
           )

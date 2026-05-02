@@ -91,6 +91,21 @@ void main() {
           .thenThrow(Exception('No internet'));
       expect(await service.searchManga('x'), isEmpty);
     });
+
+    test('forwards sort order to the query string', () async {
+      when(mockClient.get(any, headers: anyNamed('headers'))).thenAnswer(
+        (_) async => http.Response(searchResponse, 200,
+            headers: {'content-type': 'application/json; charset=utf-8'}),
+      );
+
+      await service.searchManga('one piece', sort: MangaSortOrder.highestRated);
+
+      final captured = verify(mockClient.get(captureAny, headers: anyNamed('headers')))
+          .captured
+          .first as Uri;
+      expect(captured.toString(), contains('rating'));
+      expect(captured.toString(), isNot(contains('relevance')));
+    });
   });
 
   group('fetchLatestChaptersFor', () {
@@ -176,6 +191,70 @@ void main() {
       final result = await service.fetchLatestChaptersFor(['A']);
       expect(result.keys, ['A']);
       expect(result['A']!.number, 10.0);
+    });
+  });
+
+  group('fetchPopularManga', () {
+    final popularResponse = jsonEncode({
+      'data': [
+        {
+          'id': 'manga-1',
+          'attributes': {
+            'title': {'en': 'One Piece'},
+            'altTitles': <Map<String, dynamic>>[],
+          },
+          'relationships': [
+            {
+              'id': 'cover-1',
+              'type': 'cover_art',
+              'attributes': {'fileName': 'cover.jpg'},
+            }
+          ],
+        },
+      ]
+    });
+
+    test('returns parsed list on 200', () async {
+      when(mockClient.get(any, headers: anyNamed('headers'))).thenAnswer(
+        (_) async => http.Response(popularResponse, 200,
+            headers: {'content-type': 'application/json; charset=utf-8'}),
+      );
+
+      final results = await service.fetchPopularManga();
+
+      expect(results, hasLength(1));
+      expect(results[0].id, 'manga-1');
+      expect(results[0].title, 'One Piece');
+      expect(results[0].coverUrl,
+          'https://uploads.mangadex.org/covers/manga-1/cover.jpg.512.jpg');
+    });
+
+    test('returns empty list on HTTP 500', () async {
+      when(mockClient.get(any, headers: anyNamed('headers'))).thenAnswer(
+        (_) async => http.Response('boom', 500),
+      );
+      expect(await service.fetchPopularManga(), isEmpty);
+    });
+
+    test('returns empty list on network exception', () async {
+      when(mockClient.get(any, headers: anyNamed('headers')))
+          .thenThrow(Exception('No internet'));
+      expect(await service.fetchPopularManga(), isEmpty);
+    });
+
+    test('request uses followedCount order without a title param', () async {
+      when(mockClient.get(any, headers: anyNamed('headers'))).thenAnswer(
+        (_) async => http.Response(popularResponse, 200,
+            headers: {'content-type': 'application/json; charset=utf-8'}),
+      );
+
+      await service.fetchPopularManga();
+
+      final captured = verify(mockClient.get(captureAny, headers: anyNamed('headers')))
+          .captured
+          .first as Uri;
+      expect(captured.toString(), contains('followedCount'));
+      expect(captured.toString(), isNot(contains('title=')));
     });
   });
 

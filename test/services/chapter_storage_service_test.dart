@@ -10,47 +10,33 @@ void main() {
     service = ChapterStorageService();
   });
 
-  group('getLastSeenChapter', () {
-    test('returns 0.0 when no chapter has been stored', () async {
-      final result = await service.getLastSeenChapter();
-      expect(result, 0.0);
+  group('getLastChecked / markChecked', () {
+    test('returns null when never marked', () async {
+      expect(await service.getLastChecked(), isNull);
     });
 
-    test('returns stored chapter number after save', () async {
-      await service.saveLastSeenChapter(1131.0);
-      final result = await service.getLastSeenChapter();
-      expect(result, 1131.0);
-    });
-
-    test('handles decimal chapter numbers', () async {
-      await service.saveLastSeenChapter(1130.5);
-      final result = await service.getLastSeenChapter();
-      expect(result, 1130.5);
-    });
-
-    test('overwrites previous value on repeated saves', () async {
-      await service.saveLastSeenChapter(1130.0);
-      await service.saveLastSeenChapter(1131.0);
-      final result = await service.getLastSeenChapter();
-      expect(result, 1131.0);
-    });
-  });
-
-  group('getLastChecked', () {
-    test('returns null when never saved', () async {
-      final result = await service.getLastChecked();
-      expect(result, isNull);
-    });
-
-    test('returns a timestamp close to now after save', () async {
+    test('returns a timestamp close to now after markChecked', () async {
       final before = DateTime.now().subtract(const Duration(seconds: 1));
-      await service.saveLastSeenChapter(1131.0);
+      await service.markChecked();
       final after = DateTime.now().add(const Duration(seconds: 1));
 
       final result = await service.getLastChecked();
       expect(result, isNotNull);
       expect(result!.isAfter(before), isTrue);
       expect(result.isBefore(after), isTrue);
+    });
+  });
+
+  group('polling toggle', () {
+    test('defaults to enabled', () async {
+      expect(await service.getPollingEnabled(), isTrue);
+    });
+
+    test('persists user toggle', () async {
+      await service.savePollingEnabled(false);
+      expect(await service.getPollingEnabled(), isFalse);
+      await service.savePollingEnabled(true);
+      expect(await service.getPollingEnabled(), isTrue);
     });
   });
 }

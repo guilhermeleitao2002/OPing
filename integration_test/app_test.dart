@@ -12,20 +12,22 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
       expect(find.text('OPing'), findsOneWidget);
-      expect(find.text('Latest Chapter'), findsOneWidget);
+      expect(find.text('Tracked manga'), findsOneWidget);
     });
 
-    testWidgets('home screen shows chapter card or error state', (tester) async {
+    testWidgets('home screen shows tracked-manga list or empty state',
+        (tester) async {
       app.main();
       await tester.pumpAndSettle(const Duration(seconds: 10));
 
-      final hasChapter = find.textContaining('Ch.').evaluate().isNotEmpty;
-      final hasError = find.text('Retry').evaluate().isNotEmpty;
-      expect(hasChapter || hasError, isTrue,
-          reason: 'Should show a chapter card or an error/retry state');
+      final hasTrackedItem = find.textContaining('Last seen').evaluate().isNotEmpty;
+      final hasEmptyState = find.text('No manga tracked yet').evaluate().isNotEmpty;
+      expect(hasTrackedItem || hasEmptyState, isTrue,
+          reason: 'Should show a tracked manga or the empty state');
     });
 
-    testWidgets('background polling toggle is visible and interactive', (tester) async {
+    testWidgets('background polling toggle is visible and interactive',
+        (tester) async {
       app.main();
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
@@ -45,21 +47,23 @@ void main() {
       expect(find.text('Checks for new chapters every hour'), findsOneWidget);
     });
 
-    testWidgets('Check Now button is present and tappable', (tester) async {
+    testWidgets('Add manga FAB is present and opens search screen',
+        (tester) async {
       app.main();
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
-      final checkNow = find.text('Check Now');
-      expect(checkNow, findsOneWidget);
+      final addBtn = find.text('Add manga');
+      expect(addBtn, findsOneWidget);
 
-      await tester.tap(checkNow);
-      await tester.pump();
+      await tester.tap(addBtn);
+      await tester.pumpAndSettle();
 
-      expect(find.text('Checking...'), findsOneWidget);
+      expect(find.text('Search MangaDex by title'), findsOneWidget);
 
-      await tester.pumpAndSettle(const Duration(seconds: 15));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
-      expect(find.text('Check Now'), findsOneWidget);
+      expect(find.text('Tracked manga'), findsOneWidget);
     });
 
     testWidgets('refresh icon button reloads data', (tester) async {
@@ -70,11 +74,9 @@ void main() {
       expect(refreshBtn, findsOneWidget);
 
       await tester.tap(refreshBtn);
-      await tester.pump();
-
-      expect(find.byType(CircularProgressIndicator), findsWidgets);
-
       await tester.pumpAndSettle(const Duration(seconds: 10));
+
+      expect(find.text('Tracked manga'), findsOneWidget);
     });
   });
 }

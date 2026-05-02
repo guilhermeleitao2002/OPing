@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:workmanager/workmanager.dart';
 
-import 'package:oping/models/chapter.dart';
+import 'package:oping/screens/manga_search_screen.dart';
 import 'package:oping/services/chapter_storage_service.dart';
-import 'package:oping/services/manga_dex_service.dart';
-import 'package:oping/widgets/chapter_card.dart';
+import 'package:oping/services/tracked_manga_service.dart';
+import 'package:oping/widgets/manga_card.dart';
 import 'package:oping/workers/chapter_check_worker.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,27 +16,36 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  Chapter? _latestChapter;
+  final _storage = ChapterStorageService();
+  final _tracked = TrackedMangaService();
+
+  List<TrackedManga> _items = [];
   DateTime? _lastChecked;
   bool _isLoading = true;
   bool _isChecking = false;
   bool _pollingEnabled = true;
-  String? _errorMessage;
-
-  final _mangaDex = MangaDexService();
-  final _storage = ChapterStorageService();
 
   @override
   void initState() {
     super.initState();
     _requestNotificationPermission();
-    _loadData();
-    _loadPollingState();
+    _loadAll();
   }
 
-  Future<void> _loadPollingState() async {
-    final enabled = await _storage.getPollingEnabled();
-    if (mounted) setState(() => _pollingEnabled = enabled);
+  Future<void> _loadAll() async {
+    setState(() => _isLoading = true);
+    final results = await Future.wait([
+      _tracked.getAll(),
+      _storage.getLastChecked(),
+      _storage.getPollingEnabled(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _items = results[0] as List<TrackedManga>;
+      _lastChecked = results[1] as DateTime?;
+      _pollingEnabled = results[2] as bool;
+      _isLoading = false;
+    });
   }
 
   Future<void> _setPollingEnabled(bool enabled) async {
@@ -91,41 +100,41 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      final results = await Future.wait([
-        _mangaDex.fetchLatestChapter(),
-        _storage.getLastChecked(),
-      ]);
-      if (mounted) {
-        setState(() {
-          _latestChapter = results[0] as Chapter?;
-          _lastChecked = results[1] as DateTime?;
-          _isLoading = false;
-          if (_latestChapter == null) {
-            _errorMessage = 'Could not fetch chapter data. Check your connection.';
-          }
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'An unexpected error occurred.';
-        });
-      }
-    }
-  }
-
   Future<void> _checkNow() async {
     setState(() => _isChecking = true);
     await WorkerTask().execute();
-    await _loadData();
-    setState(() => _isChecking = false);
+    await _loadAll();
+    if (mounted) setState(() => _isChecking = false);
+  }
+
+  Future<void> _openSearch() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const MangaSearchScreen()),
+    );
+    await _loadAll();
+  }
+
+  Future<void> _confirmUntrack(TrackedManga manga) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Untrack manga?'),
+        content: Text('Stop receiving notifications for ${manga.title}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Untrack'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _tracked.remove(manga.id);
+    await _loadAll();
   }
 
   @override
@@ -137,28 +146,33 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('OPing', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
+            icon: _isChecking
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.notifications_active),
+            tooltip: 'Check now',
+            onPressed: _isChecking || _isLoading ? null : _checkNow,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Reload',
-            onPressed: _isLoading ? null : _loadData,
+            onPressed: _isLoading ? null : _loadAll,
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: _loadAll,
         child: _buildBody(theme),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isChecking ? null : _checkNow,
+        onPressed: _openSearch,
         backgroundColor: theme.colorScheme.secondary,
         foregroundColor: Colors.white,
-        icon: _isChecking
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              )
-            : const Icon(Icons.notifications_active),
-        label: Text(_isChecking ? 'Checking...' : 'Check Now'),
+        icon: const Icon(Icons.add),
+        label: const Text('Add manga'),
       ),
     );
   }
@@ -171,9 +185,26 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildHeader(theme),
-        const SizedBox(height: 20),
-        if (_errorMessage != null) _buildErrorCard(theme) else if (_latestChapter != null) ChapterCard(chapter: _latestChapter!),
+        Text(
+          'Tracked manga',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_items.isEmpty)
+          _buildEmptyState(theme)
+        else
+          ..._items.map(
+            (m) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: MangaCard(
+                manga: m,
+                onUntrack: () => _confirmUntrack(m),
+              ),
+            ),
+          ),
         const SizedBox(height: 12),
         _buildLastChecked(theme),
         const SizedBox(height: 16),
@@ -183,40 +214,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader(ThemeData theme) {
-    return Row(
-      children: [
-        Text(
-          'Latest Chapter',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(width: 8),
-        const Text('\u{2694}', style: TextStyle(fontSize: 22)),
-      ],
-    );
-  }
-
-  Widget _buildErrorCard(ThemeData theme) {
+  Widget _buildEmptyState(ThemeData theme) {
     return Card(
-      color: theme.colorScheme.errorContainer,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.wifi_off, color: theme.colorScheme.error, size: 40),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: theme.colorScheme.onErrorContainer),
-            ),
+            Icon(Icons.menu_book, size: 48, color: theme.colorScheme.primary),
             const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _loadData,
-              child: const Text('Retry'),
+            Text(
+              'No manga tracked yet',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tap + to find a manga and start receiving notifications.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

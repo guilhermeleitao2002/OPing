@@ -1,6 +1,6 @@
 # OPing
 
-Android app that sends a local notification whenever a new One Piece manga chapter drops on MangaDex — no backend, no Firebase, completely free.
+Android app that lets you track any MangaDex manga and sends a local notification whenever a new chapter drops — no backend, no Firebase, completely free.
 
 <p align="center">
   <img src="images/oping_home_screen.jpeg" alt="OPing home screen" width="300"/>
@@ -8,10 +8,10 @@ Android app that sends a local notification whenever a new One Piece manga chapt
 
 ## Features
 
-- Polls MangaDex once per hour in the background via WorkManager
-- Local push notification on new chapter detection
-- Home screen shows the latest chapter with a direct MangaDex link
-- "Check Now" button for instant manual checks
+- Search MangaDex by title and subscribe to any manga from the catalogue
+- Polls MangaDex once per hour in the background via WorkManager — a single batched API call covers all tracked manga
+- Local push notification per new chapter; combined summary notification when multiple manga update at once
+- Manual "check now" button in the AppBar for instant on-demand checks
 - Toggle to pause/resume background polling
 - Zero cost: no server, no cloud functions, no subscriptions
 
@@ -106,29 +106,37 @@ flutter build apk --release     # signed release APK → build/app/outputs/flutt
 
 ```
 App launch
+  ├── migrateLegacyOnePieceSubscription()  — one-shot, idempotent
   ├── NotificationService.initialize()
   └── Workmanager.registerPeriodicTask() — hourly background job
 
 Background isolate (every ~1 hour, WorkManager)
   └── WorkerTask.execute()
-        ├── MangaDexService.fetchLatestChapter()   ← MangaDex public API, no auth
-        ├── ChapterStorageService.getLastSeenChapter()
-        └── if newer → show notification + save chapter number
+        ├── TrackedMangaService.getAll()
+        ├── MangaDexService.fetchLatestChaptersFor([ids])  ← single batched GET /chapter
+        └── for each manga where latest > lastSeen
+              ├── show single or combined notification
+              └── TrackedMangaService.updateLastSeen()
 ```
 
-Data source: MangaDex public REST API — One Piece UUID `a1c7c817-4e59-43b7-9365-09675a149a6f`.
+Data source: MangaDex public REST API — anonymous, no auth required. Search hits `GET /manga`; chapter polling hits `GET /chapter` with `manga[]=…` to fetch every tracked manga in one request.
 
 ```
 lib/
 ├── main.dart
-├── models/chapter.dart
+├── models/
+│   ├── chapter.dart
+│   └── manga.dart
 ├── services/
 │   ├── manga_dex_service.dart
 │   ├── chapter_storage_service.dart
+│   ├── tracked_manga_service.dart
 │   └── notification_service.dart
 ├── workers/chapter_check_worker.dart
-├── screens/home_screen.dart
-└── widgets/chapter_card.dart
+├── screens/
+│   ├── home_screen.dart
+│   └── manga_search_screen.dart
+└── widgets/manga_card.dart
 ```
 
 ---

@@ -6,10 +6,12 @@
 import 'dart:async' as _i3;
 
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:oping/models/chapter.dart' as _i4;
-import 'package:oping/services/chapter_storage_service.dart' as _i5;
+import 'package:oping/models/chapter.dart' as _i5;
+import 'package:oping/models/manga.dart' as _i4;
+import 'package:oping/services/chapter_storage_service.dart' as _i6;
 import 'package:oping/services/manga_dex_service.dart' as _i2;
-import 'package:oping/services/notification_service.dart' as _i6;
+import 'package:oping/services/notification_service.dart' as _i7;
+import 'package:oping/services/tracked_manga_service.dart' as _i8;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -35,39 +37,34 @@ class MockMangaDexService extends _i1.Mock implements _i2.MangaDexService {
   }
 
   @override
-  _i3.Future<_i4.Chapter?> fetchLatestChapter() =>
+  _i3.Future<List<_i4.Manga>> searchManga(String? query, {int? limit = 20}) =>
       (super.noSuchMethod(
-            Invocation.method(#fetchLatestChapter, []),
-            returnValue: _i3.Future<_i4.Chapter?>.value(),
+            Invocation.method(#searchManga, [query], {#limit: limit}),
+            returnValue: _i3.Future<List<_i4.Manga>>.value(<_i4.Manga>[]),
           )
-          as _i3.Future<_i4.Chapter?>);
+          as _i3.Future<List<_i4.Manga>>);
+
+  @override
+  _i3.Future<Map<String, _i5.Chapter>> fetchLatestChaptersFor(
+    List<String>? mangaIds,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#fetchLatestChaptersFor, [mangaIds]),
+            returnValue: _i3.Future<Map<String, _i5.Chapter>>.value(
+              <String, _i5.Chapter>{},
+            ),
+          )
+          as _i3.Future<Map<String, _i5.Chapter>>);
 }
 
 /// A class which mocks [ChapterStorageService].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockChapterStorageService extends _i1.Mock
-    implements _i5.ChapterStorageService {
+    implements _i6.ChapterStorageService {
   MockChapterStorageService() {
     _i1.throwOnMissingStub(this);
   }
-
-  @override
-  _i3.Future<double> getLastSeenChapter() =>
-      (super.noSuchMethod(
-            Invocation.method(#getLastSeenChapter, []),
-            returnValue: _i3.Future<double>.value(0.0),
-          )
-          as _i3.Future<double>);
-
-  @override
-  _i3.Future<void> saveLastSeenChapter(double? chapterNumber) =>
-      (super.noSuchMethod(
-            Invocation.method(#saveLastSeenChapter, [chapterNumber]),
-            returnValue: _i3.Future<void>.value(),
-            returnValueForMissingStub: _i3.Future<void>.value(),
-          )
-          as _i3.Future<void>);
 
   @override
   _i3.Future<DateTime?> getLastChecked() =>
@@ -76,13 +73,39 @@ class MockChapterStorageService extends _i1.Mock
             returnValue: _i3.Future<DateTime?>.value(),
           )
           as _i3.Future<DateTime?>);
+
+  @override
+  _i3.Future<void> markChecked() =>
+      (super.noSuchMethod(
+            Invocation.method(#markChecked, []),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  _i3.Future<bool> getPollingEnabled() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPollingEnabled, []),
+            returnValue: _i3.Future<bool>.value(false),
+          )
+          as _i3.Future<bool>);
+
+  @override
+  _i3.Future<void> savePollingEnabled(bool? enabled) =>
+      (super.noSuchMethod(
+            Invocation.method(#savePollingEnabled, [enabled]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
 }
 
 /// A class which mocks [NotificationService].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockNotificationService extends _i1.Mock
-    implements _i6.NotificationService {
+    implements _i7.NotificationService {
   MockNotificationService() {
     _i1.throwOnMissingStub(this);
   }
@@ -97,9 +120,87 @@ class MockNotificationService extends _i1.Mock
           as _i3.Future<void>);
 
   @override
-  _i3.Future<void> showNewChapterNotification(_i4.Chapter? chapter) =>
+  _i3.Future<void> showNewChapterNotification(
+    _i8.TrackedManga? manga,
+    _i5.Chapter? chapter,
+  ) =>
       (super.noSuchMethod(
-            Invocation.method(#showNewChapterNotification, [chapter]),
+            Invocation.method(#showNewChapterNotification, [manga, chapter]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  _i3.Future<void> showCombinedNewChaptersNotification(
+    List<_i7.MangaUpdate>? updates,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#showCombinedNewChaptersNotification, [updates]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+}
+
+/// A class which mocks [TrackedMangaService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockTrackedMangaService extends _i1.Mock
+    implements _i8.TrackedMangaService {
+  MockTrackedMangaService() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i3.Future<List<_i8.TrackedManga>> getAll() =>
+      (super.noSuchMethod(
+            Invocation.method(#getAll, []),
+            returnValue: _i3.Future<List<_i8.TrackedManga>>.value(
+              <_i8.TrackedManga>[],
+            ),
+          )
+          as _i3.Future<List<_i8.TrackedManga>>);
+
+  @override
+  _i3.Future<bool> isTracked(String? mangaId) =>
+      (super.noSuchMethod(
+            Invocation.method(#isTracked, [mangaId]),
+            returnValue: _i3.Future<bool>.value(false),
+          )
+          as _i3.Future<bool>);
+
+  @override
+  _i3.Future<void> add(_i4.Manga? manga) =>
+      (super.noSuchMethod(
+            Invocation.method(#add, [manga]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  _i3.Future<void> remove(String? mangaId) =>
+      (super.noSuchMethod(
+            Invocation.method(#remove, [mangaId]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  _i3.Future<void> updateLastSeen(String? mangaId, double? chapterNumber) =>
+      (super.noSuchMethod(
+            Invocation.method(#updateLastSeen, [mangaId, chapterNumber]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  _i3.Future<void> initializeIfMissing() =>
+      (super.noSuchMethod(
+            Invocation.method(#initializeIfMissing, []),
             returnValue: _i3.Future<void>.value(),
             returnValueForMissingStub: _i3.Future<void>.value(),
           )

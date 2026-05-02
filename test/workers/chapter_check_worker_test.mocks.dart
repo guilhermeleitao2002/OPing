@@ -6,13 +6,14 @@
 import 'dart:async' as _i3;
 
 import 'package:mockito/mockito.dart' as _i1;
+import 'package:mockito/src/dummies.dart' as _i8;
 import 'package:oping/models/chapter.dart' as _i5;
 import 'package:oping/models/chapter_pages.dart' as _i6;
 import 'package:oping/models/manga.dart' as _i4;
 import 'package:oping/services/chapter_storage_service.dart' as _i7;
 import 'package:oping/services/manga_dex_service.dart' as _i2;
-import 'package:oping/services/notification_service.dart' as _i8;
-import 'package:oping/services/tracked_manga_service.dart' as _i9;
+import 'package:oping/services/notification_service.dart' as _i9;
+import 'package:oping/services/tracked_manga_service.dart' as _i10;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -69,10 +70,15 @@ class MockMangaDexService extends _i1.Mock implements _i2.MangaDexService {
 
   @override
   _i3.Future<Map<String, _i5.Chapter>> fetchLatestChaptersFor(
-    List<String>? mangaIds,
-  ) =>
+    List<String>? mangaIds, {
+    String? language = 'en',
+  }) =>
       (super.noSuchMethod(
-            Invocation.method(#fetchLatestChaptersFor, [mangaIds]),
+            Invocation.method(
+              #fetchLatestChaptersFor,
+              [mangaIds],
+              {#language: language},
+            ),
             returnValue: _i3.Future<Map<String, _i5.Chapter>>.value(
               <String, _i5.Chapter>{},
             ),
@@ -80,16 +86,25 @@ class MockMangaDexService extends _i1.Mock implements _i2.MangaDexService {
           as _i3.Future<Map<String, _i5.Chapter>>);
 
   @override
+  _i3.Future<List<String>> fetchAvailableLanguages(String? mangaId) =>
+      (super.noSuchMethod(
+            Invocation.method(#fetchAvailableLanguages, [mangaId]),
+            returnValue: _i3.Future<List<String>>.value(<String>[]),
+          )
+          as _i3.Future<List<String>>);
+
+  @override
   _i3.Future<({List<_i5.Chapter> chapters, int total})?> fetchChapterList(
     String? mangaId, {
     int? offset = 0,
     int? limit = 100,
+    String? language = 'en',
   }) =>
       (super.noSuchMethod(
             Invocation.method(
               #fetchChapterList,
               [mangaId],
-              {#offset: offset, #limit: limit},
+              {#offset: offset, #limit: limit, #language: language},
             ),
             returnValue:
                 _i3.Future<({List<_i5.Chapter> chapters, int total})?>.value(),
@@ -185,13 +200,35 @@ class MockChapterStorageService extends _i1.Mock
             returnValueForMissingStub: _i3.Future<void>.value(),
           )
           as _i3.Future<void>);
+
+  @override
+  _i3.Future<String> getPreferredLanguage() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPreferredLanguage, []),
+            returnValue: _i3.Future<String>.value(
+              _i8.dummyValue<String>(
+                this,
+                Invocation.method(#getPreferredLanguage, []),
+              ),
+            ),
+          )
+          as _i3.Future<String>);
+
+  @override
+  _i3.Future<void> savePreferredLanguage(String? code) =>
+      (super.noSuchMethod(
+            Invocation.method(#savePreferredLanguage, [code]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
 }
 
 /// A class which mocks [NotificationService].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockNotificationService extends _i1.Mock
-    implements _i8.NotificationService {
+    implements _i9.NotificationService {
   MockNotificationService() {
     _i1.throwOnMissingStub(this);
   }
@@ -207,7 +244,7 @@ class MockNotificationService extends _i1.Mock
 
   @override
   _i3.Future<void> showNewChapterNotification(
-    _i9.TrackedManga? manga,
+    _i10.TrackedManga? manga,
     _i5.Chapter? chapter,
   ) =>
       (super.noSuchMethod(
@@ -219,7 +256,7 @@ class MockNotificationService extends _i1.Mock
 
   @override
   _i3.Future<void> showCombinedNewChaptersNotification(
-    List<_i8.MangaUpdate>? updates,
+    List<_i9.MangaUpdate>? updates,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#showCombinedNewChaptersNotification, [updates]),
@@ -233,20 +270,20 @@ class MockNotificationService extends _i1.Mock
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockTrackedMangaService extends _i1.Mock
-    implements _i9.TrackedMangaService {
+    implements _i10.TrackedMangaService {
   MockTrackedMangaService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i3.Future<List<_i9.TrackedManga>> getAll() =>
+  _i3.Future<List<_i10.TrackedManga>> getAll() =>
       (super.noSuchMethod(
             Invocation.method(#getAll, []),
-            returnValue: _i3.Future<List<_i9.TrackedManga>>.value(
-              <_i9.TrackedManga>[],
+            returnValue: _i3.Future<List<_i10.TrackedManga>>.value(
+              <_i10.TrackedManga>[],
             ),
           )
-          as _i3.Future<List<_i9.TrackedManga>>);
+          as _i3.Future<List<_i10.TrackedManga>>);
 
   @override
   _i3.Future<bool> isTracked(String? mangaId) =>

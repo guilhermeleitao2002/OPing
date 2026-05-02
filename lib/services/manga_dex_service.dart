@@ -81,25 +81,29 @@ class MangaDexService {
   }
 
   Future<Map<String, Chapter>> fetchLatestChaptersFor(
-    List<String> mangaIds,
-  ) async {
+    List<String> mangaIds, {
+    String language = 'en',
+  }) async {
     if (mangaIds.isEmpty) return {};
 
     final result = <String, Chapter>{};
     for (var i = 0; i < mangaIds.length; i += _chapterBatchSize) {
       final end = (i + _chapterBatchSize).clamp(0, mangaIds.length);
       final batch = mangaIds.sublist(i, end);
-      final batchResult = await _fetchChapterBatch(batch);
+      final batchResult = await _fetchChapterBatch(batch, language: language);
       result.addAll(batchResult);
     }
     return result;
   }
 
-  Future<Map<String, Chapter>> _fetchChapterBatch(List<String> mangaIds) async {
+  Future<Map<String, Chapter>> _fetchChapterBatch(
+    List<String> mangaIds, {
+    String language = 'en',
+  }) async {
     try {
       final params = <String, List<String>>{
         'manga[]': mangaIds,
-        'translatedLanguage[]': ['en'],
+        'translatedLanguage[]': [language],
         'order[chapter]': ['desc'],
         'contentRating[]': ['safe', 'suggestive'],
         'limit': ['100'],
@@ -130,16 +134,33 @@ class MangaDexService {
     }
   }
 
+  Future<List<String>> fetchAvailableLanguages(String mangaId) async {
+    try {
+      final response = await _get('/manga/$mangaId', {});
+      if (response == null) return [];
+      final data = response['data'] as Map<String, dynamic>?;
+      if (data == null) return [];
+      final attrs = data['attributes'] as Map<String, dynamic>?;
+      if (attrs == null) return [];
+      final langs = attrs['availableTranslatedLanguages'] as List<dynamic>?;
+      if (langs == null) return [];
+      return langs.whereType<String>().toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Returns `null` on network/API error so callers can distinguish error
   /// from a genuinely empty chapter list.
   Future<({List<Chapter> chapters, int total})?> fetchChapterList(
     String mangaId, {
     int offset = 0,
     int limit = 100,
+    String language = 'en',
   }) async {
     try {
       final params = <String, List<String>>{
-        'translatedLanguage[]': ['en'],
+        'translatedLanguage[]': [language],
         'order[chapter]': ['desc'],
         'contentRating[]': ['safe', 'suggestive', 'erotica'],
         'limit': [limit.clamp(1, 100).toString()],
@@ -223,7 +244,7 @@ class MangaDexService {
     Map<String, List<String>> params,
   ) async {
     final query = _encodeQuery(params);
-    final uri = Uri.parse('$baseUrl$path?$query');
+    final uri = Uri.parse(query.isEmpty ? '$baseUrl$path' : '$baseUrl$path?$query');
     final response = await _client
         .get(uri, headers: {'User-Agent': _userAgent})
         .timeout(_timeout);

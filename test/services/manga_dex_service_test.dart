@@ -258,6 +258,62 @@ void main() {
     });
   });
 
+  group('fetchAvailableLanguages', () {
+    test('returns language codes from availableTranslatedLanguages', () async {
+      final body = jsonEncode({
+        'data': {
+          'id': 'manga-1',
+          'type': 'manga',
+          'attributes': {
+            'availableTranslatedLanguages': ['en', 'fr', 'pt-br'],
+          },
+        },
+      });
+      when(mockClient.get(any, headers: anyNamed('headers'))).thenAnswer(
+        (_) async => http.Response(body, 200,
+            headers: {'content-type': 'application/json; charset=utf-8'}),
+      );
+
+      final result = await service.fetchAvailableLanguages('manga-1');
+      expect(result, ['en', 'fr', 'pt-br']);
+    });
+
+    test('returns empty list on HTTP 500', () async {
+      when(mockClient.get(any, headers: anyNamed('headers'))).thenAnswer(
+        (_) async => http.Response('boom', 500),
+      );
+      expect(await service.fetchAvailableLanguages('manga-1'), isEmpty);
+    });
+
+    test('returns empty list on network exception', () async {
+      when(mockClient.get(any, headers: anyNamed('headers')))
+          .thenThrow(Exception('No internet'));
+      expect(await service.fetchAvailableLanguages('manga-1'), isEmpty);
+    });
+
+    test('does not include title query param in request URL', () async {
+      final body = jsonEncode({
+        'data': {
+          'id': 'manga-1',
+          'type': 'manga',
+          'attributes': {'availableTranslatedLanguages': <String>[]},
+        },
+      });
+      when(mockClient.get(any, headers: anyNamed('headers'))).thenAnswer(
+        (_) async => http.Response(body, 200,
+            headers: {'content-type': 'application/json; charset=utf-8'}),
+      );
+
+      await service.fetchAvailableLanguages('manga-1');
+
+      final captured = verify(mockClient.get(captureAny, headers: anyNamed('headers')))
+          .captured
+          .first as Uri;
+      expect(captured.path, contains('manga-1'));
+      expect(captured.query, isEmpty);
+    });
+  });
+
   group('Chapter.isNewerThan', () {
     test('returns true when chapter number is higher', () {
       final chapter = Chapter(

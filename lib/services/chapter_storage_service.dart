@@ -4,6 +4,7 @@ class ChapterStorageService {
   static const String _lastCheckedKey = 'last_checked_timestamp';
   static const String _pollingEnabledKey = 'polling_enabled';
   static const String _pollIntervalKey = 'poll_interval_minutes';
+  static const String _preferredLanguageKey = 'preferred_language';
 
   Future<DateTime?> getLastChecked() async {
     final prefs = await SharedPreferences.getInstance();
@@ -35,5 +36,15 @@ class ChapterStorageService {
   Future<void> savePollIntervalMinutes(int minutes) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_pollIntervalKey, minutes);
+  }
+
+  Future<String> getPreferredLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_preferredLanguageKey) ?? 'en';
+  }
+
+  Future<void> savePreferredLanguage(String code) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_preferredLanguageKey, code);
   }
 }

@@ -3,8 +3,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:oping/models/app_language.dart';
 import 'package:oping/models/chapter.dart';
+import 'package:oping/models/chapter_source.dart';
 import 'package:oping/screens/chapter_reader_screen.dart';
 import 'package:oping/services/chapter_storage_service.dart';
+import 'package:oping/services/comick_service.dart';
 import 'package:oping/services/manga_dex_service.dart';
 import 'package:oping/services/tracked_manga_service.dart';
 
@@ -21,6 +23,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   static const int _pageSize = 100;
 
   final _mangaDex = MangaDexService();
+  final _comick = ComickService();
   final _storage = ChapterStorageService();
   final _scrollController = ScrollController();
 
@@ -32,10 +35,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   String _preferredLanguage = 'en';
   String? _overrideLanguage;
+  // Cached once per screen session; not re-fetched on chip selection.
   List<String> _availableLanguages = [];
 
-  String get _effectiveLanguage => _overrideLanguage ?? _preferredLanguage;
+  ({String hid, String slug})? _comickInfo;
+  int _comickPage = 1;
+  ChapterSource _activeSource = ChapterSource.mangadex;
 
+  String get _effectiveLanguage => _overrideLanguage ?? _preferredLanguage;
   bool get _hasMore => _chapters.length < _total;
 
   @override
@@ -65,24 +72,74 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
   }
 
-  Future<void> _loadInitial() async {
+  /// [clearAvailable]: pass true to flush the cached available-language list
+  /// (used by the Retry button after a hard error).
+  Future<void> _loadInitial({bool clearAvailable = false}) async {
     setState(() {
       _isInitialLoading = true;
       _hasInitialError = false;
       _chapters.clear();
       _total = 0;
-      _availableLanguages = [];
+      _comickPage = 1;
+      _activeSource = ChapterSource.mangadex;
+      if (clearAvailable) _availableLanguages = [];
     });
-    final result = await _mangaDex.fetchChapterList(
+
+    // ── 1. Try MangaDex ──────────────────────────────────────────────────────
+    final mdResult = await _mangaDex.fetchChapterList(
       widget.manga.id,
       offset: 0,
       limit: _pageSize,
       language: _effectiveLanguage,
     );
     if (!mounted) return;
-    if (result == null) {
+
+    if (mdResult == null) {
+      // Network/API error — show error state (don't fall through to ComicK).
       setState(() { _isInitialLoading = false; _hasInitialError = true; });
-    } else if (result.total == 0) {
+      return;
+    }
+
+    if (mdResult.total > 0) {
+      setState(() {
+        _isInitialLoading = false;
+        _chapters.addAll(mdResult.chapters);
+        _total = mdResult.total;
+        _activeSource = ChapterSource.mangadex;
+      });
+      return;
+    }
+
+    // ── 2. MangaDex has 0 chapters → try ComicK ──────────────────────────────
+    _comickInfo ??= await _comick.findComic(widget.manga.title);
+    if (!mounted) return;
+
+    if (_comickInfo != null) {
+      final ckResult = await _comick.fetchChapterList(
+        _comickInfo!.hid,
+        slug: _comickInfo!.slug,
+        mangaId: widget.manga.id,
+        page: 1,
+        limit: _pageSize,
+        language: _effectiveLanguage,
+      );
+      if (!mounted) return;
+
+      if (ckResult != null && ckResult.total > 0) {
+        setState(() {
+          _isInitialLoading = false;
+          _chapters.addAll(ckResult.chapters);
+          _total = ckResult.total;
+          _comickPage = 1;
+          _activeSource = ChapterSource.comick;
+        });
+        return;
+      }
+    }
+
+    // ── 3. Both sources have 0 chapters → show language picker ───────────────
+    if (_availableLanguages.isEmpty) {
+      // First time hitting empty for this manga — fetch available languages.
       final langs = await _mangaDex.fetchAvailableLanguages(widget.manga.id);
       if (!mounted) return;
       setState(() {
@@ -90,10 +147,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         _availableLanguages = langs.where((l) => l != _effectiveLanguage).toList();
       });
     } else {
+      // A chip was tapped and still returned 0 — remove that language from the list.
       setState(() {
         _isInitialLoading = false;
-        _chapters.addAll(result.chapters);
-        _total = result.total;
+        _availableLanguages =
+            _availableLanguages.where((l) => l != _effectiveLanguage).toList();
       });
     }
   }
@@ -101,20 +159,42 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   Future<void> _loadMore() async {
     if (_isLoadingMore || !_hasMore) return;
     setState(() => _isLoadingMore = true);
-    final result = await _mangaDex.fetchChapterList(
-      widget.manga.id,
-      offset: _chapters.length,
-      limit: _pageSize,
-      language: _effectiveLanguage,
-    );
-    if (!mounted) return;
-    setState(() {
-      _isLoadingMore = false;
-      if (result != null) {
-        _chapters.addAll(result.chapters);
-        _total = result.total;
-      }
-    });
+
+    if (_activeSource == ChapterSource.comick && _comickInfo != null) {
+      final nextPage = _comickPage + 1;
+      final result = await _comick.fetchChapterList(
+        _comickInfo!.hid,
+        slug: _comickInfo!.slug,
+        mangaId: widget.manga.id,
+        page: nextPage,
+        limit: _pageSize,
+        language: _effectiveLanguage,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+        if (result != null) {
+          _chapters.addAll(result.chapters);
+          _total = result.total;
+          _comickPage = nextPage;
+        }
+      });
+    } else {
+      final result = await _mangaDex.fetchChapterList(
+        widget.manga.id,
+        offset: _chapters.length,
+        limit: _pageSize,
+        language: _effectiveLanguage,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+        if (result != null) {
+          _chapters.addAll(result.chapters);
+          _total = result.total;
+        }
+      });
+    }
   }
 
   void _switchLanguage(String code) {
@@ -130,7 +210,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.manga.title, overflow: TextOverflow.ellipsis),
@@ -167,7 +246,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 FilledButton.tonal(
-                    onPressed: _loadInitial, child: const Text('Retry')),
+                  onPressed: () => _loadInitial(clearAvailable: true),
+                  child: const Text('Retry'),
+                ),
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: _openInBrowser,
@@ -219,17 +300,17 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                 color: theme.colorScheme.outlineVariant),
             const SizedBox(height: 12),
             Text(
-              'No $currentLabel chapters found.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant),
+              'No $currentLabel chapters found from any source.',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             if (_availableLanguages.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 'Available languages:',
-                style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outlineVariant),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.outlineVariant),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -247,8 +328,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               const SizedBox(height: 6),
               Text(
                 'The manga may host chapters externally.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outlineVariant),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.outlineVariant),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -266,6 +347,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
   Widget _buildHeader(ThemeData theme) {
     final langLabel = AppLanguage.labelForCode(_effectiveLanguage);
+    final sourceBadge =
+        _activeSource == ChapterSource.comick ? ' · via ComicK' : '';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
@@ -274,7 +357,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               size: 15, color: theme.colorScheme.primary),
           const SizedBox(width: 6),
           Text(
-            '$_total $langLabel ${_total == 1 ? 'chapter' : 'chapters'}',
+            '$_total $langLabel ${_total == 1 ? 'chapter' : 'chapters'}$sourceBadge',
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,

@@ -21,12 +21,22 @@ class ChapterPages {
     );
   }
 
+  // For sources that provide complete image URLs (e.g. ComicK).
+  factory ChapterPages.fromAbsoluteUrls(List<String> urls) => ChapterPages(
+        baseUrl: '',
+        hash: '',
+        data: List<String>.from(urls),
+        dataSaver: List<String>.from(urls),
+      );
+
   int get count => data.length;
 
   String pageUrl(int index, {bool dataSaver = false}) {
-    if (dataSaver && this.dataSaver.length > index) {
-      return '$baseUrl/data-saver/$hash/${this.dataSaver[index]}';
-    }
-    return '$baseUrl/data/$hash/${data[index]}';
+    final item = dataSaver && this.dataSaver.length > index
+        ? this.dataSaver[index]
+        : data[index];
+    if (item.startsWith('http')) return item;
+    final dir = dataSaver ? 'data-saver' : 'data';
+    return '$baseUrl/$dir/$hash/$item';
   }
 }

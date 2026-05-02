@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'package:oping/models/chapter.dart';
+import 'package:oping/models/chapter_pages.dart';
 import 'package:oping/models/manga.dart';
 
 enum MangaSortOrder { relevance, mostFollowed, highestRated, recentUpload, newest }
@@ -126,6 +127,75 @@ class MangaDexService {
       return latest;
     } catch (_) {
       return {};
+    }
+  }
+
+  Future<List<Chapter>> fetchChapterList(String mangaId) async {
+    try {
+      final params = <String, List<String>>{
+        'translatedLanguage[]': ['en'],
+        'order[chapter]': ['desc'],
+        'contentRating[]': ['safe', 'suggestive', 'erotica'],
+        'limit': ['100'],
+      };
+      final response = await _get('/manga/$mangaId/feed', params);
+      if (response == null) return [];
+      final data = response['data'];
+      if (data is! List) return [];
+      final chapters = <Chapter>[];
+      for (final item in data) {
+        if (item is! Map<String, dynamic>) continue;
+        try {
+          chapters.add(Chapter.fromChapterJsonItem(item, fallbackMangaId: mangaId));
+        } catch (_) {}
+      }
+      return chapters;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<ChapterPages?> fetchChapterPages(String chapterId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/at-home/server/$chapterId');
+      final response = await _client
+          .get(uri, headers: {'User-Agent': _userAgent})
+          .timeout(_timeout);
+      if (response.statusCode != 200) return null;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return null;
+      return ChapterPages.fromJson(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> reportPageLoad({
+    required String url,
+    required bool success,
+    int bytes = 0,
+    int duration = 0,
+    bool cached = false,
+  }) async {
+    try {
+      await _client
+          .post(
+            Uri.parse('https://api.mangadex.network/report'),
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': _userAgent,
+            },
+            body: jsonEncode({
+              'url': url,
+              'success': success,
+              'bytes': bytes,
+              'duration': duration,
+              'cached': cached,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Best-effort; never fail the caller.
     }
   }
 

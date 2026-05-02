@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:workmanager/workmanager.dart';
 
+import 'package:oping/screens/chapter_list_screen.dart';
 import 'package:oping/screens/manga_search_screen.dart';
 import 'package:oping/services/chapter_storage_service.dart';
 import 'package:oping/services/tracked_manga_service.dart';
@@ -215,6 +216,9 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: MangaCard(
                 manga: m,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => ChapterListScreen(manga: m),
+                )),
                 onUntrack: () => _confirmUntrack(m),
               ),
             ),
@@ -314,17 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(
-                'MangaDex allows ~5 req/s per IP. Each poll uses 1 request, '
-                'so any interval here is well within the limit. '
-                'See api.mangadex.org/docs for full rate-limit details.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
+            const SizedBox(height: 4),
           ],
         ],
       ),

@@ -130,18 +130,26 @@ class MangaDexService {
     }
   }
 
-  Future<List<Chapter>> fetchChapterList(String mangaId) async {
+  /// Returns `null` on network/API error so callers can distinguish error
+  /// from a genuinely empty chapter list.
+  Future<({List<Chapter> chapters, int total})?> fetchChapterList(
+    String mangaId, {
+    int offset = 0,
+    int limit = 100,
+  }) async {
     try {
       final params = <String, List<String>>{
         'translatedLanguage[]': ['en'],
         'order[chapter]': ['desc'],
         'contentRating[]': ['safe', 'suggestive', 'erotica'],
-        'limit': ['100'],
+        'limit': [limit.clamp(1, 100).toString()],
+        'offset': [offset.toString()],
       };
       final response = await _get('/manga/$mangaId/feed', params);
-      if (response == null) return [];
+      if (response == null) return null;
       final data = response['data'];
-      if (data is! List) return [];
+      if (data is! List) return null;
+      final total = (response['total'] as num?)?.toInt() ?? 0;
       final chapters = <Chapter>[];
       for (final item in data) {
         if (item is! Map<String, dynamic>) continue;
@@ -149,9 +157,9 @@ class MangaDexService {
           chapters.add(Chapter.fromChapterJsonItem(item, fallbackMangaId: mangaId));
         } catch (_) {}
       }
-      return chapters;
+      return (chapters: chapters, total: total);
     } catch (_) {
-      return [];
+      return null;
     }
   }
 

@@ -5,6 +5,7 @@ class Chapter {
   final String title;
   final DateTime publishedAt;
   final String mangaDexUrl;
+  final String? externalUrl;
 
   const Chapter({
     required this.id,
@@ -13,7 +14,10 @@ class Chapter {
     required this.title,
     required this.publishedAt,
     required this.mangaDexUrl,
+    this.externalUrl,
   });
+
+  bool get isExternal => externalUrl != null;
 
   factory Chapter.fromMangaDexJson(Map<String, dynamic> json, {String? mangaId}) {
     final data = json['data'] as List<dynamic>;
@@ -32,6 +36,8 @@ class Chapter {
     final publishedAt = DateTime.parse(attrs['publishAt'] as String);
     final mangaId = _resolveMangaId(item['relationships']) ?? fallbackMangaId ?? '';
 
+    final rawExternal = attrs['externalUrl'] as String?;
+
     return Chapter(
       id: id,
       mangaId: mangaId,
@@ -39,6 +45,7 @@ class Chapter {
       title: title,
       publishedAt: publishedAt,
       mangaDexUrl: 'https://mangadex.org/chapter/$id',
+      externalUrl: (rawExternal?.isNotEmpty ?? false) ? rawExternal : null,
     );
   }
 

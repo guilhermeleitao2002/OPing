@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ChapterStorageService {
   static const String _lastCheckedKey = 'last_checked_timestamp';
   static const String _pollingEnabledKey = 'polling_enabled';
+  static const String _pollIntervalKey = 'poll_interval_minutes';
 
   Future<DateTime?> getLastChecked() async {
     final prefs = await SharedPreferences.getInstance();
@@ -24,5 +25,15 @@ class ChapterStorageService {
   Future<void> savePollingEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_pollingEnabledKey, enabled);
+  }
+
+  Future<int> getPollIntervalMinutes() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_pollIntervalKey) ?? 60;
+  }
+
+  Future<void> savePollIntervalMinutes(int minutes) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_pollIntervalKey, minutes);
   }
 }

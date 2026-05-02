@@ -24,6 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _isChecking = false;
   bool _pollingEnabled = true;
+  int _pollIntervalMinutes = 60;
+
+  static const List<int> _intervalOptions = [15, 30, 60, 120, 180];
 
   @override
   void initState() {
@@ -38,12 +41,14 @@ class _HomeScreenState extends State<HomeScreen> {
       _tracked.getAll(),
       _storage.getLastChecked(),
       _storage.getPollingEnabled(),
+      _storage.getPollIntervalMinutes(),
     ]);
     if (!mounted) return;
     setState(() {
       _items = results[0] as List<TrackedManga>;
       _lastChecked = results[1] as DateTime?;
       _pollingEnabled = results[2] as bool;
+      _pollIntervalMinutes = results[3] as int;
       _isLoading = false;
     });
   }
@@ -51,18 +56,27 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _setPollingEnabled(bool enabled) async {
     await _storage.savePollingEnabled(enabled);
     if (enabled) {
-      await Workmanager().registerPeriodicTask(
-        WorkerTask.taskName,
-        WorkerTask.taskName,
-        frequency: const Duration(hours: 1),
-        constraints: Constraints(networkType: NetworkType.connected),
-        existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
-      );
+      await _registerPeriodicTask(_pollIntervalMinutes);
     } else {
       await Workmanager().cancelByUniqueName(WorkerTask.taskName);
     }
     if (mounted) setState(() => _pollingEnabled = enabled);
   }
+
+  Future<void> _setPollInterval(int minutes) async {
+    await _storage.savePollIntervalMinutes(minutes);
+    if (_pollingEnabled) await _registerPeriodicTask(minutes);
+    if (mounted) setState(() => _pollIntervalMinutes = minutes);
+  }
+
+  Future<void> _registerPeriodicTask(int intervalMinutes) =>
+      Workmanager().registerPeriodicTask(
+        WorkerTask.taskName,
+        WorkerTask.taskName,
+        frequency: Duration(minutes: intervalMinutes),
+        constraints: Constraints(networkType: NetworkType.connected),
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
+      );
 
   Future<void> _requestNotificationPermission() async {
     final status = await Permission.notification.status;
@@ -256,20 +270,71 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPollingToggle(ThemeData theme) {
     return Card(
-      child: SwitchListTile(
-        title: const Text('Background polling'),
-        subtitle: Text(
-          _pollingEnabled ? 'Checks for new chapters every hour' : 'Notifications paused',
-          style: theme.textTheme.bodySmall,
-        ),
-        secondary: Icon(
-          _pollingEnabled ? Icons.notifications_active : Icons.notifications_off,
-          color: _pollingEnabled ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-        ),
-        value: _pollingEnabled,
-        onChanged: _setPollingEnabled,
+      child: Column(
+        children: [
+          SwitchListTile(
+            title: const Text('Background polling'),
+            subtitle: Text(
+              _pollingEnabled
+                  ? 'Checks for new chapters every ${_labelForInterval(_pollIntervalMinutes)}'
+                  : 'Notifications paused',
+              style: theme.textTheme.bodySmall,
+            ),
+            secondary: Icon(
+              _pollingEnabled ? Icons.notifications_active : Icons.notifications_off,
+              color: _pollingEnabled
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            value: _pollingEnabled,
+            onChanged: _setPollingEnabled,
+          ),
+          if (_pollingEnabled) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text('Check interval', style: theme.textTheme.bodyMedium),
+                  ),
+                  DropdownButton<int>(
+                    value: _intervalOptions.contains(_pollIntervalMinutes)
+                        ? _pollIntervalMinutes
+                        : 60,
+                    underline: const SizedBox.shrink(),
+                    items: _intervalOptions
+                        .map((m) => DropdownMenuItem(
+                              value: m,
+                              child: Text(_labelForInterval(m)),
+                            ))
+                        .toList(),
+                    onChanged: (v) { if (v != null) _setPollInterval(v); },
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                'MangaDex allows ~5 req/s per IP. Each poll uses 1 request, '
+                'so any interval here is well within the limit. '
+                'See api.mangadex.org/docs for full rate-limit details.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
+  }
+
+  String _labelForInterval(int minutes) {
+    if (minutes < 60) return '$minutes min';
+    final h = minutes ~/ 60;
+    return h == 1 ? '1 hour' : '$h hours';
   }
 
   String _formatRelative(DateTime dt) {

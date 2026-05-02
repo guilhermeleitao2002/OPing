@@ -4,6 +4,7 @@ import 'package:workmanager/workmanager.dart';
 
 import 'package:oping/models/manga.dart';
 import 'package:oping/screens/home_screen.dart';
+import 'package:oping/services/chapter_storage_service.dart';
 import 'package:oping/services/manga_dex_service.dart';
 import 'package:oping/services/notification_service.dart';
 import 'package:oping/services/tracked_manga_service.dart';
@@ -28,11 +29,12 @@ Future<void> main() async {
   }
 
   try {
+    final intervalMinutes = await ChapterStorageService().getPollIntervalMinutes();
     await Workmanager().initialize(callbackDispatcher);
     await Workmanager().registerPeriodicTask(
       WorkerTask.taskName,
       WorkerTask.taskName,
-      frequency: const Duration(hours: 1),
+      frequency: Duration(minutes: intervalMinutes),
       constraints: Constraints(networkType: NetworkType.connected),
       existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
     );

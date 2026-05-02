@@ -1,0 +1,1 @@
+enum ChapterSource { mangadex, comick }

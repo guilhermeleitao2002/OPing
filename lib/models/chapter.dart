@@ -1,3 +1,5 @@
+import 'package:oping/models/chapter_source.dart';
+
 class Chapter {
   final String id;
   final String mangaId;
@@ -6,6 +8,7 @@ class Chapter {
   final DateTime publishedAt;
   final String mangaDexUrl;
   final String? externalUrl;
+  final ChapterSource source;
 
   const Chapter({
     required this.id,
@@ -15,6 +18,7 @@ class Chapter {
     required this.publishedAt,
     required this.mangaDexUrl,
     this.externalUrl,
+    this.source = ChapterSource.mangadex,
   });
 
   bool get isExternal => externalUrl != null;

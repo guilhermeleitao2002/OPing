@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:oping/models/chapter.dart';
 import 'package:oping/models/chapter_pages.dart';
+import 'package:oping/models/chapter_source.dart';
+import 'package:oping/services/comick_service.dart';
 import 'package:oping/services/manga_dex_service.dart';
 
 class ChapterReaderScreen extends StatefulWidget {
@@ -22,6 +24,7 @@ class ChapterReaderScreen extends StatefulWidget {
 
 class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
   final _mangaDex = MangaDexService();
+  final _comick = ComickService();
   final _pageController = PageController();
 
   ChapterPages? _pages;
@@ -52,7 +55,9 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
 
   Future<void> _loadPages() async {
     setState(() { _pages = null; _hasError = false; });
-    final pages = await _mangaDex.fetchChapterPages(widget.chapter.id);
+    final pages = widget.chapter.source == ChapterSource.comick
+        ? await _comick.fetchChapterPages(widget.chapter.id)
+        : await _mangaDex.fetchChapterPages(widget.chapter.id);
     if (!mounted) return;
     setState(() {
       _pages = pages;
@@ -85,6 +90,9 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
     }
 
     if (_hasError) {
+      final sourceName = widget.chapter.source == ChapterSource.comick
+          ? 'ComicK'
+          : 'MangaDex';
       return _buildMessage(
         icon: Icons.broken_image_outlined,
         text: 'Failed to load chapter.',
@@ -92,7 +100,7 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
           FilledButton(onPressed: _loadPages, child: const Text('Retry')),
           const SizedBox(width: 12),
           _BrowserButton(
-            label: 'Open in MangaDex',
+            label: 'Open in $sourceName',
             onPressed: () => _openUrl(widget.chapter.mangaDexUrl),
           ),
         ],
@@ -106,12 +114,15 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
 
     // Chapter loaded but has no hosted pages (publisher controls the content).
     if (_pages!.count == 0) {
+      final sourceName = widget.chapter.source == ChapterSource.comick
+          ? 'ComicK'
+          : 'MangaDex';
       return _buildMessage(
         icon: Icons.no_photography_outlined,
-        text: 'Pages are not hosted on MangaDex for this chapter.',
+        text: 'Pages are not hosted on $sourceName for this chapter.',
         actions: [
           _BrowserButton(
-            label: 'Open in MangaDex',
+            label: 'Open in $sourceName',
             onPressed: () => _openUrl(widget.chapter.mangaDexUrl),
           ),
         ],
@@ -187,8 +198,8 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
           fit: BoxFit.contain,
           loadingBuilder: (_, child, progress) {
             if (progress == null) {
-              // Image finished loading — fire report once per page index.
-              if (_reported.add(index)) {
+              if (_reported.add(index) &&
+                  widget.chapter.source == ChapterSource.mangadex) {
                 _mangaDex.reportPageLoad(url: url, success: true);
               }
               return child;
@@ -204,7 +215,8 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
             );
           },
           errorBuilder: (context, error, stackTrace) {
-            if (_reported.add(index)) {
+            if (_reported.add(index) &&
+                widget.chapter.source == ChapterSource.mangadex) {
               _mangaDex.reportPageLoad(url: url, success: false);
             }
             return const Center(

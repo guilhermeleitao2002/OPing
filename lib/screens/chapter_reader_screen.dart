@@ -32,14 +32,19 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
   int _currentPage = 0;
   bool _showOverlay = true;
 
+  // For external chapters: holds the ComicK chapter found as fallback.
+  bool _checkingComickFallback = false;
+  Chapter? _comickChapter;
+
   // Tracks which page indices have already had their report fired.
   final Set<int> _reported = {};
 
   @override
   void initState() {
     super.initState();
-    // Skip network call entirely for external chapters.
-    if (!widget.chapter.isExternal) {
+    if (widget.chapter.isExternal) {
+      _tryComickFallback();
+    } else {
       _loadPages();
     }
     Future.delayed(const Duration(seconds: 3), () {
@@ -53,11 +58,37 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
     super.dispose();
   }
 
+  Future<void> _tryComickFallback() async {
+    setState(() => _checkingComickFallback = true);
+    try {
+      final comicInfo = await _comick.findComic(widget.mangaTitle);
+      if (comicInfo == null) {
+        if (mounted) setState(() => _checkingComickFallback = false);
+        return;
+      }
+      final chapter = await _comick.findChapterByNumber(
+        comicInfo.hid,
+        slug: comicInfo.slug,
+        mangaId: widget.chapter.mangaId,
+        chapterNumber: widget.chapter.number,
+      );
+      if (chapter == null) {
+        if (mounted) setState(() => _checkingComickFallback = false);
+        return;
+      }
+      if (mounted) setState(() { _comickChapter = chapter; _checkingComickFallback = false; });
+      await _loadPages();
+    } catch (_) {
+      if (mounted) setState(() => _checkingComickFallback = false);
+    }
+  }
+
   Future<void> _loadPages() async {
     setState(() { _pages = null; _hasError = false; });
-    final pages = widget.chapter.source == ChapterSource.comick
-        ? await _comick.fetchChapterPages(widget.chapter.id)
-        : await _mangaDex.fetchChapterPages(widget.chapter.id);
+    final effectiveChapter = _comickChapter ?? widget.chapter;
+    final pages = effectiveChapter.source == ChapterSource.comick
+        ? await _comick.fetchChapterPages(effectiveChapter.id)
+        : await _mangaDex.fetchChapterPages(effectiveChapter.id);
     if (!mounted) return;
     setState(() {
       _pages = pages;
@@ -84,15 +115,21 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
   }
 
   Widget _buildBody() {
-    // External chapter — hosted on a third-party site.
-    if (widget.chapter.isExternal) {
+    // External chapter — try ComicK first, only fall back to external link if needed.
+    if (widget.chapter.isExternal && _comickChapter == null) {
+      if (_checkingComickFallback) {
+        return const Center(child: CircularProgressIndicator(color: Colors.white));
+      }
+      // ComicK check complete and failed — show external link.
       return _buildExternalView(widget.chapter.externalUrl!);
     }
 
+    final effectiveChapter = _comickChapter ?? widget.chapter;
+    final isComick = effectiveChapter.source == ChapterSource.comick;
+    final sourceName = isComick ? 'ComicK' : 'MangaDex';
+    final sourceUrl = effectiveChapter.mangaDexUrl;
+
     if (_hasError) {
-      final sourceName = widget.chapter.source == ChapterSource.comick
-          ? 'ComicK'
-          : 'MangaDex';
       return _buildMessage(
         icon: Icons.broken_image_outlined,
         text: 'Failed to load chapter.',
@@ -101,7 +138,7 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
           const SizedBox(width: 12),
           _BrowserButton(
             label: 'Open in $sourceName',
-            onPressed: () => _openUrl(widget.chapter.mangaDexUrl),
+            onPressed: () => _openUrl(sourceUrl),
           ),
         ],
       );
@@ -114,16 +151,13 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
 
     // Chapter loaded but has no hosted pages (publisher controls the content).
     if (_pages!.count == 0) {
-      final sourceName = widget.chapter.source == ChapterSource.comick
-          ? 'ComicK'
-          : 'MangaDex';
       return _buildMessage(
         icon: Icons.no_photography_outlined,
         text: 'Pages are not hosted on $sourceName for this chapter.',
         actions: [
           _BrowserButton(
             label: 'Open in $sourceName',
-            onPressed: () => _openUrl(widget.chapter.mangaDexUrl),
+            onPressed: () => _openUrl(sourceUrl),
           ),
         ],
       );

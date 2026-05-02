@@ -88,6 +88,44 @@ class ComickService {
     }
   }
 
+  // Finds a specific chapter by number. Returns the first match, or null.
+  Future<Chapter?> findChapterByNumber(
+    String comicHid, {
+    required String mangaId,
+    String slug = '-',
+    required double chapterNumber,
+    String language = 'en',
+  }) async {
+    try {
+      final lang = _toComickLang(language);
+      final chapStr = chapterNumber == chapterNumber.truncateToDouble()
+          ? chapterNumber.toInt().toString()
+          : chapterNumber.toString();
+      final uri = Uri.parse(
+        '$_base/comic/$comicHid/chapters'
+        '?lang=$lang&limit=10&chap=$chapStr',
+      );
+      final response = await _client
+          .get(uri, headers: {'User-Agent': _userAgent})
+          .timeout(_timeout);
+      if (response.statusCode != 200) return null;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return null;
+      final rawChapters = decoded['chapters'] as List<dynamic>?;
+      if (rawChapters == null || rawChapters.isEmpty) return null;
+      for (final item in rawChapters) {
+        if (item is! Map<String, dynamic>) continue;
+        try {
+          final chapter = _parseChapter(item, mangaId: mangaId, slug: slug, lang: lang);
+          if (chapter.number == chapterNumber) return chapter;
+        } catch (_) {}
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<ChapterPages?> fetchChapterPages(String chapterHid) async {
     try {
       final uri = Uri.parse('$_base/chapter/$chapterHid');

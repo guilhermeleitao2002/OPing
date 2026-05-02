@@ -5,6 +5,18 @@ import 'package:http/http.dart' as http;
 import 'package:oping/models/chapter.dart';
 import 'package:oping/models/manga.dart';
 
+enum MangaSortOrder { relevance, mostFollowed, highestRated, recentUpload, newest }
+
+extension MangaSortOrderParams on MangaSortOrder {
+  Map<String, List<String>> get queryParams => switch (this) {
+        MangaSortOrder.relevance    => {'order[relevance]': ['desc']},
+        MangaSortOrder.mostFollowed => {'order[followedCount]': ['desc']},
+        MangaSortOrder.highestRated => {'order[rating]': ['desc']},
+        MangaSortOrder.recentUpload => {'order[latestUploadedChapter]': ['desc']},
+        MangaSortOrder.newest       => {'order[createdAt]': ['desc']},
+      };
+}
+
 class MangaDexService {
   static const String baseUrl = 'https://api.mangadex.org';
   static const String onePieceMangaId = 'a1c7c817-4e59-43b7-9365-09675a149a6f';
@@ -16,14 +28,18 @@ class MangaDexService {
 
   MangaDexService({http.Client? client}) : _client = client ?? http.Client();
 
-  Future<List<Manga>> searchManga(String query, {int limit = 20}) async {
+  Future<List<Manga>> searchManga(
+    String query, {
+    int limit = 20,
+    MangaSortOrder sort = MangaSortOrder.relevance,
+  }) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return [];
     try {
       final params = <String, List<String>>{
         'title': [trimmed],
         'limit': [limit.clamp(1, 100).toString()],
-        'order[relevance]': ['desc'],
+        ...sort.queryParams,
         'contentRating[]': ['safe', 'suggestive', 'erotica'],
         'includes[]': ['cover_art'],
       };
@@ -33,16 +49,28 @@ class MangaDexService {
       final data = response['data'];
       if (data is! List) return [];
 
-      final results = <Manga>[];
-      for (final item in data) {
-        if (item is! Map<String, dynamic>) continue;
-        try {
-          results.add(Manga.fromMangaDexJson(item));
-        } catch (_) {
-          // Skip malformed items rather than failing the whole search.
-        }
-      }
-      return results;
+      return _parseMangaList(data);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<Manga>> fetchPopularManga({int limit = 18}) async {
+    try {
+      final params = <String, List<String>>{
+        'limit': [limit.clamp(1, 100).toString()],
+        'order[followedCount]': ['desc'],
+        'contentRating[]': ['safe', 'suggestive', 'erotica'],
+        'includes[]': ['cover_art'],
+        'hasAvailableChapters': ['true'],
+      };
+      final response = await _get('/manga', params);
+      if (response == null) return [];
+
+      final data = response['data'];
+      if (data is! List) return [];
+
+      return _parseMangaList(data);
     } catch (_) {
       return [];
     }
@@ -96,6 +124,17 @@ class MangaDexService {
     } catch (_) {
       return {};
     }
+  }
+
+  List<Manga> _parseMangaList(List<dynamic> data) {
+    final results = <Manga>[];
+    for (final item in data) {
+      if (item is! Map<String, dynamic>) continue;
+      try {
+        results.add(Manga.fromMangaDexJson(item));
+      } catch (_) {}
+    }
+    return results;
   }
 
   Future<Map<String, dynamic>?> _get(

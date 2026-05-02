@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import 'package:oping/services/tracked_manga_service.dart';
 
 class MangaCard extends StatelessWidget {
   final TrackedManga manga;
+  final VoidCallback? onTap;
   final VoidCallback? onUntrack;
 
-  const MangaCard({super.key, required this.manga, this.onUntrack});
+  const MangaCard({super.key, required this.manga, this.onTap, this.onUntrack});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +17,7 @@ class MangaCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _openMangaDex('https://mangadex.org/title/${manga.id}'),
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -61,13 +60,6 @@ class MangaCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _openMangaDex(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 
   static String _formatNumber(double number) {

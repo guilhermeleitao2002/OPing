@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:oping/models/chapter.dart';
 import 'package:oping/models/chapter_pages.dart';
@@ -34,7 +35,10 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPages();
+    // Skip network call entirely for external chapters.
+    if (!widget.chapter.isExternal) {
+      _loadPages();
+    }
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) setState(() => _showOverlay = false);
     });
@@ -56,6 +60,11 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
     });
   }
 
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   void _toggleOverlay() => setState(() => _showOverlay = !_showOverlay);
 
   @override
@@ -70,26 +79,43 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
   }
 
   Widget _buildBody() {
+    // External chapter — hosted on a third-party site.
+    if (widget.chapter.isExternal) {
+      return _buildExternalView(widget.chapter.externalUrl!);
+    }
+
     if (_hasError) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.broken_image_outlined,
-                size: 64, color: Colors.white54),
-            const SizedBox(height: 16),
-            const Text('Failed to load chapter.',
-                style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: _loadPages, child: const Text('Retry')),
-          ],
-        ),
+      return _buildMessage(
+        icon: Icons.broken_image_outlined,
+        text: 'Failed to load chapter.',
+        actions: [
+          FilledButton(onPressed: _loadPages, child: const Text('Retry')),
+          const SizedBox(width: 12),
+          _BrowserButton(
+            label: 'Open in MangaDex',
+            onPressed: () => _openUrl(widget.chapter.mangaDexUrl),
+          ),
+        ],
       );
     }
 
     if (_pages == null) {
       return const Center(
           child: CircularProgressIndicator(color: Colors.white));
+    }
+
+    // Chapter loaded but has no hosted pages (publisher controls the content).
+    if (_pages!.count == 0) {
+      return _buildMessage(
+        icon: Icons.no_photography_outlined,
+        text: 'Pages are not hosted on MangaDex for this chapter.',
+        actions: [
+          _BrowserButton(
+            label: 'Open in MangaDex',
+            onPressed: () => _openUrl(widget.chapter.mangaDexUrl),
+          ),
+        ],
+      );
     }
 
     return Stack(
@@ -108,6 +134,45 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
           _BottomBar(current: _currentPage + 1, total: _pages!.count),
         ],
       ],
+    );
+  }
+
+  Widget _buildExternalView(String url) {
+    return _buildMessage(
+      icon: Icons.launch_rounded,
+      text: 'This chapter is hosted on an external site.',
+      actions: [
+        _BrowserButton(label: 'Open chapter', onPressed: () => _openUrl(url)),
+      ],
+    );
+  }
+
+  Widget _buildMessage({
+    required IconData icon,
+    required String text,
+    required List<Widget> actions,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 56, color: Colors.white38),
+            const SizedBox(height: 16),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 15),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: actions,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -159,6 +224,25 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
       ),
     );
   }
+}
+
+// ── Shared widgets ─────────────────────────────────────────────────────────────
+
+class _BrowserButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+
+  const _BrowserButton({required this.label, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.open_in_browser, size: 16, color: Colors.white70),
+        label: Text(label, style: const TextStyle(color: Colors.white70)),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.white30),
+        ),
+      );
 }
 
 // ── Overlay widgets ────────────────────────────────────────────────────────────

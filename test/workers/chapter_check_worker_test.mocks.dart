@@ -7,11 +7,12 @@ import 'dart:async' as _i3;
 
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:oping/models/chapter.dart' as _i5;
+import 'package:oping/models/chapter_pages.dart' as _i6;
 import 'package:oping/models/manga.dart' as _i4;
-import 'package:oping/services/chapter_storage_service.dart' as _i6;
+import 'package:oping/services/chapter_storage_service.dart' as _i7;
 import 'package:oping/services/manga_dex_service.dart' as _i2;
-import 'package:oping/services/notification_service.dart' as _i7;
-import 'package:oping/services/tracked_manga_service.dart' as _i8;
+import 'package:oping/services/notification_service.dart' as _i8;
+import 'package:oping/services/tracked_manga_service.dart' as _i9;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -77,13 +78,59 @@ class MockMangaDexService extends _i1.Mock implements _i2.MangaDexService {
             ),
           )
           as _i3.Future<Map<String, _i5.Chapter>>);
+
+  @override
+  _i3.Future<({List<_i5.Chapter> chapters, int total})?> fetchChapterList(
+    String? mangaId, {
+    int? offset = 0,
+    int? limit = 100,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #fetchChapterList,
+              [mangaId],
+              {#offset: offset, #limit: limit},
+            ),
+            returnValue:
+                _i3.Future<({List<_i5.Chapter> chapters, int total})?>.value(),
+          )
+          as _i3.Future<({List<_i5.Chapter> chapters, int total})?>);
+
+  @override
+  _i3.Future<_i6.ChapterPages?> fetchChapterPages(String? chapterId) =>
+      (super.noSuchMethod(
+            Invocation.method(#fetchChapterPages, [chapterId]),
+            returnValue: _i3.Future<_i6.ChapterPages?>.value(),
+          )
+          as _i3.Future<_i6.ChapterPages?>);
+
+  @override
+  _i3.Future<void> reportPageLoad({
+    required String? url,
+    required bool? success,
+    int? bytes = 0,
+    int? duration = 0,
+    bool? cached = false,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#reportPageLoad, [], {
+              #url: url,
+              #success: success,
+              #bytes: bytes,
+              #duration: duration,
+              #cached: cached,
+            }),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
 }
 
 /// A class which mocks [ChapterStorageService].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockChapterStorageService extends _i1.Mock
-    implements _i6.ChapterStorageService {
+    implements _i7.ChapterStorageService {
   MockChapterStorageService() {
     _i1.throwOnMissingStub(this);
   }
@@ -144,7 +191,7 @@ class MockChapterStorageService extends _i1.Mock
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockNotificationService extends _i1.Mock
-    implements _i7.NotificationService {
+    implements _i8.NotificationService {
   MockNotificationService() {
     _i1.throwOnMissingStub(this);
   }
@@ -160,7 +207,7 @@ class MockNotificationService extends _i1.Mock
 
   @override
   _i3.Future<void> showNewChapterNotification(
-    _i8.TrackedManga? manga,
+    _i9.TrackedManga? manga,
     _i5.Chapter? chapter,
   ) =>
       (super.noSuchMethod(
@@ -172,7 +219,7 @@ class MockNotificationService extends _i1.Mock
 
   @override
   _i3.Future<void> showCombinedNewChaptersNotification(
-    List<_i7.MangaUpdate>? updates,
+    List<_i8.MangaUpdate>? updates,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#showCombinedNewChaptersNotification, [updates]),
@@ -186,20 +233,20 @@ class MockNotificationService extends _i1.Mock
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockTrackedMangaService extends _i1.Mock
-    implements _i8.TrackedMangaService {
+    implements _i9.TrackedMangaService {
   MockTrackedMangaService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i3.Future<List<_i8.TrackedManga>> getAll() =>
+  _i3.Future<List<_i9.TrackedManga>> getAll() =>
       (super.noSuchMethod(
             Invocation.method(#getAll, []),
-            returnValue: _i3.Future<List<_i8.TrackedManga>>.value(
-              <_i8.TrackedManga>[],
+            returnValue: _i3.Future<List<_i9.TrackedManga>>.value(
+              <_i9.TrackedManga>[],
             ),
           )
-          as _i3.Future<List<_i8.TrackedManga>>);
+          as _i3.Future<List<_i9.TrackedManga>>);
 
   @override
   _i3.Future<bool> isTracked(String? mangaId) =>

@@ -7,6 +7,7 @@ import 'package:oping/screens/chapter_list_screen.dart';
 import 'package:oping/screens/manga_search_screen.dart';
 import 'package:oping/services/chapter_storage_service.dart';
 import 'package:oping/services/tracked_manga_service.dart';
+import 'package:oping/widgets/app_scope.dart';
 import 'package:oping/widgets/manga_card.dart';
 import 'package:oping/workers/chapter_check_worker.dart';
 
@@ -27,7 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isChecking = false;
   bool _pollingEnabled = true;
   int _pollIntervalMinutes = 60;
-  AppLanguage _preferredLanguage = AppLanguage.english;
 
   static const List<int> _intervalOptions = [15, 30, 60, 120, 180];
 
@@ -45,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _storage.getLastChecked(),
       _storage.getPollingEnabled(),
       _storage.getPollIntervalMinutes(),
-      _storage.getPreferredLanguage(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -53,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _lastChecked = results[1] as DateTime?;
       _pollingEnabled = results[2] as bool;
       _pollIntervalMinutes = results[3] as int;
-      _preferredLanguage = AppLanguage.fromCode(results[4] as String);
       _isLoading = false;
     });
   }
@@ -72,11 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await _storage.savePollIntervalMinutes(minutes);
     if (_pollingEnabled) await _registerPeriodicTask(minutes);
     if (mounted) setState(() => _pollIntervalMinutes = minutes);
-  }
-
-  Future<void> _setPreferredLanguage(AppLanguage lang) async {
-    await _storage.savePreferredLanguage(lang.code);
-    if (mounted) setState(() => _preferredLanguage = lang);
   }
 
   Future<void> _registerPeriodicTask(int intervalMinutes) =>
@@ -99,25 +92,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showPermissionDialog() {
+    final s = AppScope.of(context).strings;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Notifications Disabled'),
-        content: const Text(
-          'OPing needs notification permission to alert you about new chapters. '
-          'Please enable it in app settings.',
-        ),
+        title: Text(s.notificationsDisabledTitle),
+        content: Text(s.notificationsDisabledBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               openAppSettings();
             },
-            child: const Text('Open Settings'),
+            child: Text(s.openSettings),
           ),
         ],
       ),
@@ -139,19 +130,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _confirmUntrack(TrackedManga manga) async {
+    final s = AppScope.of(context).strings;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Untrack manga?'),
-        content: Text('Stop receiving notifications for ${manga.title}?'),
+        title: Text(s.untrackDialogTitle),
+        content: Text(s.untrackDialogBody(manga.title)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Untrack'),
+            child: Text(s.untrack),
           ),
         ],
       ),
@@ -164,10 +156,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppScope.of(context).strings;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OPing', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(s.appTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: _isChecking
@@ -177,31 +170,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.notifications_active),
-            tooltip: 'Check now',
+            tooltip: s.checkNow,
             onPressed: _isChecking || _isLoading ? null : _checkNow,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Reload',
+            tooltip: s.reload,
             onPressed: _isLoading ? null : _loadAll,
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadAll,
-        child: _buildBody(theme),
+        child: _buildBody(theme, s),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openSearch,
-        backgroundColor: theme.colorScheme.secondary,
-        foregroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.tertiary,
         icon: const Icon(Icons.add),
-        label: const Text('Add manga'),
+        label: Text(s.addManga),
       ),
     );
   }
 
-  Widget _buildBody(ThemeData theme) {
+  Widget _buildBody(ThemeData theme, dynamic s) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -209,16 +201,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          'Tracked manga',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-          ),
+        Row(
+          children: [
+            Icon(Icons.bookmark_rounded, size: 16, color: theme.colorScheme.primary),
+            const SizedBox(width: 4),
+            Text(
+              s.trackedMangaTitle,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         if (_items.isEmpty)
-          _buildEmptyState(theme)
+          _buildEmptyState(theme, s)
         else
           ..._items.map(
             (m) => Padding(
@@ -232,30 +230,34 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-        const SizedBox(height: 12),
-        _buildLastChecked(theme),
+        const SizedBox(height: 8),
+        _buildLastChecked(theme, s),
         const SizedBox(height: 16),
-        _buildPollingToggle(theme),
+        _buildPollingToggle(theme, s),
         const SizedBox(height: 80),
       ],
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(ThemeData theme, dynamic s) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Column(
           children: [
-            Icon(Icons.menu_book, size: 48, color: theme.colorScheme.primary),
+            Icon(
+              Icons.menu_book,
+              size: 64,
+              color: theme.colorScheme.primary.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: 12),
             Text(
-              'No manga tracked yet',
-              style: theme.textTheme.titleMedium,
+              s.noMangaTracked,
+              style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
             Text(
-              'Tap + to find a manga and start receiving notifications.',
+              s.noMangaTrackedHint,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -267,30 +269,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildLastChecked(ThemeData theme) {
+  Widget _buildLastChecked(ThemeData theme, dynamic s) {
     final text = _lastChecked == null
-        ? 'Never checked via background'
-        : 'Last background check: ${_formatRelative(_lastChecked!)}';
+        ? s.neverChecked
+        : s.lastCheckedAgo(_formatRelative(_lastChecked!, s));
 
-    return Text(
-      text,
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Icon(
+            Icons.history,
+            size: 14,
+            color: theme.colorScheme.outlineVariant,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
-      textAlign: TextAlign.center,
     );
   }
 
-  Widget _buildPollingToggle(ThemeData theme) {
+  Widget _buildPollingToggle(ThemeData theme, dynamic s) {
+    final scope = AppScope.of(context);
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
         children: [
           SwitchListTile(
-            title: const Text('Background polling'),
+            title: Text(s.backgroundPolling),
             subtitle: Text(
               _pollingEnabled
-                  ? 'Checks for new chapters every ${_labelForInterval(_pollIntervalMinutes)}'
-                  : 'Notifications paused',
+                  ? s.checksEvery(s.intervalLabel(_pollIntervalMinutes))
+                  : s.notificationsPaused,
               style: theme.textTheme.bodySmall,
             ),
             secondary: Icon(
@@ -304,51 +320,38 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           if (_pollingEnabled) ...[
             const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('Check interval', style: theme.textTheme.bodyMedium),
-                  ),
-                  DropdownButton<int>(
-                    value: _intervalOptions.contains(_pollIntervalMinutes)
-                        ? _pollIntervalMinutes
-                        : 60,
-                    underline: const SizedBox.shrink(),
-                    items: _intervalOptions
-                        .map((m) => DropdownMenuItem(
-                              value: m,
-                              child: Text(_labelForInterval(m)),
-                            ))
-                        .toList(),
-                    onChanged: (v) { if (v != null) _setPollInterval(v); },
-                  ),
-                ],
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              title: Text(s.checkInterval, style: theme.textTheme.bodyMedium),
+              trailing: DropdownButton<int>(
+                value: _intervalOptions.contains(_pollIntervalMinutes)
+                    ? _pollIntervalMinutes
+                    : 60,
+                underline: const SizedBox.shrink(),
+                items: _intervalOptions
+                    .map((m) => DropdownMenuItem(
+                          value: m,
+                          child: Text(s.intervalLabel(m)),
+                        ))
+                    .toList(),
+                onChanged: (v) { if (v != null) _setPollInterval(v); },
               ),
             ),
-            const SizedBox(height: 4),
           ],
           const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text('Reading language', style: theme.textTheme.bodyMedium),
-                ),
-                DropdownButton<AppLanguage>(
-                  value: _preferredLanguage,
-                  underline: const SizedBox.shrink(),
-                  items: AppLanguage.values
-                      .map((l) => DropdownMenuItem(
-                            value: l,
-                            child: Text(l.label),
-                          ))
-                      .toList(),
-                  onChanged: (v) { if (v != null) _setPreferredLanguage(v); },
-                ),
-              ],
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            title: Text(s.readingLanguage, style: theme.textTheme.bodyMedium),
+            trailing: DropdownButton<AppLanguage>(
+              value: scope.language,
+              underline: const SizedBox.shrink(),
+              items: AppLanguage.values
+                  .map((l) => DropdownMenuItem(
+                        value: l,
+                        child: Text(l.label),
+                      ))
+                  .toList(),
+              onChanged: (v) { if (v != null) scope.changeLanguage(v); },
             ),
           ),
         ],
@@ -356,17 +359,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _labelForInterval(int minutes) {
-    if (minutes < 60) return '$minutes min';
-    final h = minutes ~/ 60;
-    return h == 1 ? '1 hour' : '$h hours';
-  }
-
-  String _formatRelative(DateTime dt) {
+  String _formatRelative(DateTime dt, dynamic s) {
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+    if (diff.inMinutes < 1) return s.justNow;
+    if (diff.inMinutes < 60) return s.minutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return s.hoursAgo(diff.inHours);
+    return s.daysAgo(diff.inDays);
   }
 }

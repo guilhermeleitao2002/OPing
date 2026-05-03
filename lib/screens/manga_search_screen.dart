@@ -2,19 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:oping/l10n/app_strings.dart';
 import 'package:oping/models/manga.dart';
 import 'package:oping/services/manga_dex_service.dart';
 import 'package:oping/services/tracked_manga_service.dart';
+import 'package:oping/widgets/app_scope.dart';
 
 // ── Display helpers for sort order ────────────────────────────────────────────
 
 extension _SortOrderDisplay on MangaSortOrder {
-  String get label => switch (this) {
-        MangaSortOrder.relevance    => 'Relevance',
-        MangaSortOrder.mostFollowed => 'Most Popular',
-        MangaSortOrder.highestRated => 'Top Rated',
-        MangaSortOrder.recentUpload => 'Recently Updated',
-        MangaSortOrder.newest       => 'Newest',
+  String label(AppStrings s) => switch (this) {
+        MangaSortOrder.relevance    => s.relevanceLabel,
+        MangaSortOrder.mostFollowed => s.mostPopularLabel,
+        MangaSortOrder.highestRated => s.topRatedLabel,
+        MangaSortOrder.recentUpload => s.recentlyUpdatedLabel,
+        MangaSortOrder.newest       => s.newestLabel,
       };
 
   IconData get icon => switch (this) {
@@ -202,10 +204,11 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
     final results = await _mangaDex.searchManga(trimmed, sort: _sort);
     if (!mounted || _activeQuery != trimmed) return;
 
+    final s = AppScope.of(context).strings;
     setState(() {
       _isSearching = false;
       _results = results;
-      _errorMessage = results.isEmpty ? 'No results for "$trimmed"' : null;
+      _errorMessage = results.isEmpty ? s.noResultsFor(trimmed) : null;
     });
   }
 
@@ -216,10 +219,11 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
       setState(() { _isSearching = true; _errorMessage = null; });
       final results = await _mangaDex.searchManga(_activeQuery, sort: sort);
       if (!mounted) return;
+      final s = AppScope.of(context).strings;
       setState(() {
         _isSearching = false;
         _results = results;
-        _errorMessage = results.isEmpty ? 'No results for "$_activeQuery"' : null;
+        _errorMessage = results.isEmpty ? s.noResultsFor(_activeQuery) : null;
       });
     } else {
       setState(() => _isLoadingPopular = true);
@@ -234,10 +238,11 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
   Future<void> _track(Manga manga) async {
     await _tracked.add(manga);
     if (!mounted) return;
+    final s = AppScope.of(context).strings;
     setState(() { _trackedIds = {..._trackedIds, manga.id}; _didChange = true; });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Now tracking ${manga.title}'),
+        content: Text(s.nowTracking(manga.title)),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -249,6 +254,7 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppScope.of(context).strings;
 
     return PopScope<Object?>(
       canPop: true,
@@ -258,7 +264,7 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
       child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
         appBar: AppBar(
-          title: const Text('Add manga'),
+          title: Text(s.addManga),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Padding(
@@ -268,17 +274,17 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
                 focusNode: _focusNode,
                 autofocus: true,
                 textInputAction: TextInputAction.search,
-                style: theme.textTheme.bodyLarge,
+                style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Search MangaDex by title…',
+                  hintText: s.searchHint,
+                  hintStyle: const TextStyle(color: Colors.white60),
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.6),
-                  prefixIcon: const Icon(Icons.search),
+                  fillColor: Colors.white.withValues(alpha: 0.15),
+                  prefixIcon: const Icon(Icons.search, color: Colors.white60),
                   suffixIcon: _controller.text.isEmpty
                       ? null
                       : IconButton(
-                          icon: const Icon(Icons.clear),
+                          icon: const Icon(Icons.clear, color: Colors.white60),
                           onPressed: () {
                             _controller.clear();
                             _onQueryChanged('');
@@ -308,19 +314,25 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
                 children: [
                   _FilterChips(
                     selected: _sort,
+                    strings: s,
                     onChanged: _changeSort,
                   ),
-                  Expanded(child: _buildMainContent(theme)),
+                  Expanded(child: _buildMainContent(theme, s)),
                 ],
               ),
             ),
             // ── Autocomplete overlay ────────────────────────────────────────
             if (_showSuggestions)
-              _SuggestionsPanel(
-                suggestions: _suggestions,
-                isLoading: _isLoadingSuggestions,
-                trackedIds: _trackedIds,
-                onSelect: _selectSuggestion,
+              AnimatedOpacity(
+                opacity: _showSuggestions ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.easeOut,
+                child: _SuggestionsPanel(
+                  suggestions: _suggestions,
+                  isLoading: _isLoadingSuggestions,
+                  trackedIds: _trackedIds,
+                  onSelect: _selectSuggestion,
+                ),
               ),
           ],
         ),
@@ -328,13 +340,14 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
     );
   }
 
-  Widget _buildMainContent(ThemeData theme) {
+  Widget _buildMainContent(ThemeData theme, AppStrings s) {
     if (_activeQuery.isEmpty) {
       return _PopularSection(
         manga: _popular,
         isLoading: _isLoadingPopular,
         trackedIds: _trackedIds,
         onTrack: _track,
+        strings: s,
       );
     }
     if (_isSearching) {
@@ -365,6 +378,7 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
         manga: _results[i],
         isTracked: _trackedIds.contains(_results[i].id),
         onTrack: () => _track(_results[i]),
+        strings: s,
       ),
     );
   }
@@ -374,30 +388,48 @@ class _MangaSearchScreenState extends State<MangaSearchScreen> {
 
 class _FilterChips extends StatelessWidget {
   final MangaSortOrder selected;
+  final AppStrings strings;
   final ValueChanged<MangaSortOrder> onChanged;
 
-  const _FilterChips({required this.selected, required this.onChanged});
+  const _FilterChips({
+    required this.selected,
+    required this.strings,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Row(
-        children: MangaSortOrder.values.map((sort) {
-          final isSelected = sort == selected;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(sort.label),
-              avatar: Icon(sort.icon, size: 14),
-              selected: isSelected,
-              showCheckmark: false,
-              onSelected: (_) => onChanged(sort),
-              visualDensity: VisualDensity.compact,
-            ),
-          );
-        }).toList(),
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: Row(
+          children: MangaSortOrder.values.map((sort) {
+            final isSelected = sort == selected;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(sort.label(strings)),
+                avatar: Icon(sort.icon, size: 14),
+                selected: isSelected,
+                showCheckmark: false,
+                onSelected: (_) => onChanged(sort),
+                visualDensity: VisualDensity.compact,
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -495,12 +527,14 @@ class _PopularSection extends StatelessWidget {
   final bool isLoading;
   final Set<String> trackedIds;
   final Future<void> Function(Manga) onTrack;
+  final AppStrings strings;
 
   const _PopularSection({
     required this.manga,
     required this.isLoading,
     required this.trackedIds,
     required this.onTrack,
+    required this.strings,
   });
 
   @override
@@ -519,7 +553,7 @@ class _PopularSection extends StatelessWidget {
             Icon(Icons.search, size: 64, color: theme.colorScheme.outlineVariant),
             const SizedBox(height: 16),
             Text(
-              'Search for a manga above',
+              strings.searchPrompt,
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -539,7 +573,7 @@ class _PopularSection extends StatelessWidget {
                     size: 18, color: theme.colorScheme.primary),
                 const SizedBox(width: 6),
                 Text(
-                  'Popular on MangaDex',
+                  strings.popularOnMangaDex,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.primary,
@@ -644,16 +678,17 @@ class _PopularCard extends StatelessWidget {
                     ),
                     child: const Icon(Icons.check, color: Colors.white, size: 16),
                   )
-                : GestureDetector(
-                    onTap: onTrack,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
+                : Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: onTrack,
+                      child: const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: Icon(Icons.add, color: Colors.white, size: 16),
                       ),
-                      child: const Icon(Icons.add, color: Colors.white, size: 16),
                     ),
                   ),
           ),
@@ -676,11 +711,13 @@ class _ResultTile extends StatelessWidget {
   final Manga manga;
   final bool isTracked;
   final VoidCallback onTrack;
+  final AppStrings strings;
 
   const _ResultTile({
     required this.manga,
     required this.isTracked,
     required this.onTrack,
+    required this.strings,
   });
 
   @override
@@ -711,7 +748,7 @@ class _ResultTile extends StatelessWidget {
               const SizedBox(width: 8),
               isTracked
                   ? Chip(
-                      label: const Text('Tracked'),
+                      label: Text(strings.trackedLabel),
                       labelStyle: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.primary,
                       ),
@@ -729,7 +766,7 @@ class _ResultTile extends StatelessWidget {
                         minimumSize: const Size(0, 34),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text('Track'),
+                      child: Text(strings.trackLabel),
                     ),
             ],
           ),

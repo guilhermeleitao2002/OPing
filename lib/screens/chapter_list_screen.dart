@@ -9,6 +9,7 @@ import 'package:oping/services/chapter_storage_service.dart';
 import 'package:oping/services/comick_service.dart';
 import 'package:oping/services/manga_dex_service.dart';
 import 'package:oping/services/tracked_manga_service.dart';
+import 'package:oping/widgets/app_scope.dart';
 
 class ChapterListScreen extends StatefulWidget {
   final TrackedManga manga;
@@ -210,13 +211,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppScope.of(context).strings;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.manga.title, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
             icon: const Icon(Icons.open_in_browser),
-            tooltip: 'Open in MangaDex',
+            tooltip: s.openInMangaDex,
             onPressed: _openInBrowser,
           ),
         ],
@@ -226,6 +228,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   }
 
   Widget _buildBody(ThemeData theme) {
+    final s = AppScope.of(context).strings;
+
     if (_isInitialLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -238,7 +242,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             Icon(Icons.cloud_off_rounded, size: 48,
                 color: theme.colorScheme.outlineVariant),
             const SizedBox(height: 12),
-            Text('Failed to load chapters.',
+            Text(s.failedToLoadChapters,
                 style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 16),
@@ -247,7 +251,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               children: [
                 FilledButton.tonal(
                   onPressed: () => _loadInitial(clearAvailable: true),
-                  child: const Text('Retry'),
+                  child: Text(s.retry),
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
@@ -263,14 +267,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     }
 
     if (_chapters.isEmpty) {
-      return _buildEmptyLanguageState(theme);
+      return _buildEmptyLanguageState(theme, s);
     }
 
     return ListView.builder(
       controller: _scrollController,
       itemCount: _chapters.length + 1,
       itemBuilder: (_, i) {
-        if (i == 0) return _buildHeader(theme);
+        if (i == 0) return _buildHeader(theme, s);
         final idx = i - 1;
         if (idx < _chapters.length) {
           return _ChapterTile(
@@ -279,8 +283,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           );
         }
         return _isLoadingMore
-            ? const Padding(
-                padding: EdgeInsets.all(16),
+            ? const SizedBox(
+                height: 64,
                 child: Center(child: CircularProgressIndicator()),
               )
             : const SizedBox.shrink();
@@ -288,7 +292,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     );
   }
 
-  Widget _buildEmptyLanguageState(ThemeData theme) {
+  Widget _buildEmptyLanguageState(ThemeData theme, dynamic s) {
     final currentLabel = AppLanguage.labelForCode(_effectiveLanguage);
     return Center(
       child: Padding(
@@ -300,7 +304,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                 color: theme.colorScheme.outlineVariant),
             const SizedBox(height: 12),
             Text(
-              'No $currentLabel chapters found from any source.',
+              s.noChaptersFound(currentLabel),
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
@@ -308,7 +312,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             if (_availableLanguages.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                'Available languages:',
+                s.availableLanguages,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outlineVariant),
               ),
@@ -327,7 +331,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             ] else ...[
               const SizedBox(height: 6),
               Text(
-                'The manga may host chapters externally.',
+                s.chaptersHostedExternally,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outlineVariant),
                 textAlign: TextAlign.center,
@@ -337,7 +341,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
             OutlinedButton.icon(
               onPressed: _openInBrowser,
               icon: const Icon(Icons.open_in_browser, size: 16),
-              label: const Text('View on MangaDex'),
+              label: Text(s.viewOnMangaDex),
             ),
           ],
         ),
@@ -345,22 +349,34 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     );
   }
 
-  Widget _buildHeader(ThemeData theme) {
+  Widget _buildHeader(ThemeData theme, dynamic s) {
     final langLabel = AppLanguage.labelForCode(_effectiveLanguage);
     final sourceBadge =
-        _activeSource == ChapterSource.comick ? ' · via ComicK' : '';
+        _activeSource == ChapterSource.comick ? s.viaComicK : '';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
         children: [
-          Icon(Icons.library_books_rounded,
-              size: 15, color: theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Text(
-            '$_total $langLabel ${_total == 1 ? 'chapter' : 'chapters'}$sourceBadge',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.library_books_rounded,
+                    size: 15, color: theme.colorScheme.onPrimaryContainer),
+                const SizedBox(width: 6),
+                Text(
+                  '${s.chapterCount(_total, langLabel)}$sourceBadge',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -378,13 +394,27 @@ class _ChapterTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppScope.of(context).strings;
     return ListTile(
+      leading: Container(
+        width: 3,
+        height: 28,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
       title: Text(
         chapter.title.isNotEmpty
-            ? 'Ch. ${_fmt(chapter.number)}: ${chapter.title}'
-            : 'Chapter ${_fmt(chapter.number)}',
+            ? s.chapterWithTitle(_fmt(chapter.number), chapter.title)
+            : s.chapterNumber(_fmt(chapter.number)),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        style: chapter.title.isNotEmpty
+            ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)
+            : theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
       ),
       subtitle: Text(
         _formatDate(chapter.publishedAt),

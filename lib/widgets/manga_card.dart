@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:oping/services/tracked_manga_service.dart';
+import 'package:oping/widgets/app_scope.dart';
 
 class MangaCard extends StatelessWidget {
   final TrackedManga manga;
@@ -11,10 +12,17 @@ class MangaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppScope.of(context).strings;
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
@@ -23,7 +31,19 @@ class MangaCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _Cover(coverUrl: manga.coverUrl, theme: theme),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: _Cover(coverUrl: manga.coverUrl, theme: theme),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -38,21 +58,42 @@ class MangaCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      manga.lastSeenChapter > 0
-                          ? 'Last seen: Chapter ${_formatNumber(manga.lastSeenChapter)}'
-                          : 'No chapters seen yet',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                    manga.lastSeenChapter > 0
+                        ? RichText(
+                            text: TextSpan(
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: '${_labelPrefix(s)} ',
+                                ),
+                                TextSpan(
+                                  text: _formatNumber(manga.lastSeenChapter),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Text(
+                            s.noChaptersSeen,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
                   ],
                 ),
               ),
               if (onUntrack != null)
                 IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Untrack',
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: theme.colorScheme.error.withValues(alpha: 0.7),
+                  ),
+                  tooltip: s.untrack,
                   onPressed: onUntrack,
                 ),
             ],
@@ -60,6 +101,15 @@ class MangaCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Returns the label part before the chapter number, e.g. "Last seen: Chapter"
+  String _labelPrefix(dynamic s) {
+    // Extract the label portion (everything before the chapter number placeholder)
+    final full = s.lastSeenChapter(_formatNumber(manga.lastSeenChapter));
+    final num = _formatNumber(manga.lastSeenChapter);
+    final idx = full.lastIndexOf(num);
+    return idx > 0 ? full.substring(0, idx).trimRight() : full;
   }
 
   static String _formatNumber(double number) {
@@ -77,7 +127,7 @@ class _Cover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: SizedBox(
         width: 56,
         height: 80,

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
+import 'package:oping/models/app_language.dart';
 import 'package:oping/models/manga.dart';
 import 'package:oping/screens/home_screen.dart';
 import 'package:oping/services/chapter_storage_service.dart';
 import 'package:oping/services/manga_dex_service.dart';
 import 'package:oping/services/notification_service.dart';
 import 'package:oping/services/tracked_manga_service.dart';
+import 'package:oping/widgets/app_scope.dart';
 import 'package:oping/workers/chapter_check_worker.dart';
 
 Future<void> main() async {
@@ -66,8 +68,32 @@ Future<void> migrateLegacyOnePieceSubscription() async {
   }
 }
 
-class OPingApp extends StatelessWidget {
+class OPingApp extends StatefulWidget {
   const OPingApp({super.key});
+
+  @override
+  State<OPingApp> createState() => _OPingAppState();
+}
+
+class _OPingAppState extends State<OPingApp> {
+  final _storage = ChapterStorageService();
+  AppLanguage _language = AppLanguage.english;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLanguage();
+  }
+
+  Future<void> _loadLanguage() async {
+    final code = await _storage.getPreferredLanguage();
+    if (mounted) setState(() => _language = AppLanguage.fromCode(code));
+  }
+
+  Future<void> _changeLanguage(AppLanguage lang) async {
+    await _storage.savePreferredLanguage(lang.code);
+    if (mounted) setState(() => _language = lang);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,14 +105,21 @@ class OPingApp extends StatelessWidget {
           seedColor: const Color(0xFF1B3A6B),
           primary: const Color(0xFF1B3A6B),
           secondary: const Color(0xFFD4AF37),
+          tertiary: const Color(0xFFD4AF37),
           brightness: Brightness.light,
         ),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1B3A6B),
           foregroundColor: Colors.white,
-          elevation: 2,
+          elevation: 0,
+          scrolledUnderElevation: 4,
         ),
+      ),
+      builder: (context, child) => AppScope(
+        language: _language,
+        changeLanguage: _changeLanguage,
+        child: child!,
       ),
       home: const HomeScreen(),
     );

@@ -7,6 +7,7 @@ import 'package:oping/models/chapter_pages.dart';
 import 'package:oping/models/chapter_source.dart';
 import 'package:oping/services/comick_service.dart';
 import 'package:oping/services/manga_dex_service.dart';
+import 'package:oping/widgets/app_scope.dart';
 
 class ChapterReaderScreen extends StatefulWidget {
   final Chapter chapter;
@@ -109,19 +110,21 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: _buildBody(),
+        body: _buildBody(context),
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(BuildContext context) {
+    final s = AppScope.of(context).strings;
+
     // External chapter — try ComicK first, only fall back to external link if needed.
     if (widget.chapter.isExternal && _comickChapter == null) {
       if (_checkingComickFallback) {
         return const Center(child: CircularProgressIndicator(color: Colors.white));
       }
       // ComicK check complete and failed — show external link.
-      return _buildExternalView(widget.chapter.externalUrl!);
+      return _buildExternalView(widget.chapter.externalUrl!, s);
     }
 
     final effectiveChapter = _comickChapter ?? widget.chapter;
@@ -132,12 +135,12 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
     if (_hasError) {
       return _buildMessage(
         icon: Icons.broken_image_outlined,
-        text: 'Failed to load chapter.',
+        text: s.failedToLoadChapter,
         actions: [
-          FilledButton(onPressed: _loadPages, child: const Text('Retry')),
+          FilledButton(onPressed: _loadPages, child: Text(s.retry)),
           const SizedBox(width: 12),
           _BrowserButton(
-            label: 'Open in $sourceName',
+            label: s.openIn(sourceName),
             onPressed: () => _openUrl(sourceUrl),
           ),
         ],
@@ -153,10 +156,10 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
     if (_pages!.count == 0) {
       return _buildMessage(
         icon: Icons.no_photography_outlined,
-        text: 'Pages are not hosted on $sourceName for this chapter.',
+        text: s.pagesNotHostedOn(sourceName),
         actions: [
           _BrowserButton(
-            label: 'Open in $sourceName',
+            label: s.openIn(sourceName),
             onPressed: () => _openUrl(sourceUrl),
           ),
         ],
@@ -171,7 +174,7 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
             controller: _pageController,
             itemCount: _pages!.count,
             onPageChanged: (i) => setState(() => _currentPage = i),
-            itemBuilder: (_, i) => _buildPage(i),
+            itemBuilder: (ctx, i) => _buildPage(ctx, i),
           ),
         ),
         if (_showOverlay) ...[
@@ -182,12 +185,12 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
     );
   }
 
-  Widget _buildExternalView(String url) {
+  Widget _buildExternalView(String url, dynamic s) {
     return _buildMessage(
       icon: Icons.launch_rounded,
-      text: 'This chapter is hosted on an external site.',
+      text: s.chapterHostedExternally,
       actions: [
-        _BrowserButton(label: 'Open chapter', onPressed: () => _openUrl(url)),
+        _BrowserButton(label: s.openChapter, onPressed: () => _openUrl(url)),
       ],
     );
   }
@@ -221,7 +224,8 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
     );
   }
 
-  Widget _buildPage(int index) {
+  Widget _buildPage(BuildContext context, int index) {
+    final s = AppScope.of(context).strings;
     final url = _pages!.pageUrl(index);
     return InteractiveViewer(
       minScale: 0.8,
@@ -248,20 +252,22 @@ class _ChapterReaderScreenState extends State<ChapterReaderScreen> {
               ),
             );
           },
-          errorBuilder: (context, error, stackTrace) {
+          errorBuilder: (ctx, error, stackTrace) {
             if (_reported.add(index) &&
                 widget.chapter.source == ChapterSource.mangadex) {
               _mangaDex.reportPageLoad(url: url, success: false);
             }
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.broken_image_outlined,
+                  const Icon(Icons.broken_image_outlined,
                       color: Colors.white38, size: 48),
-                  SizedBox(height: 8),
-                  Text('Failed to load page',
-                      style: TextStyle(color: Colors.white38)),
+                  const SizedBox(height: 8),
+                  Text(
+                    s.failedToLoadPage,
+                    style: const TextStyle(color: Colors.white38),
+                  ),
                 ],
               ),
             );

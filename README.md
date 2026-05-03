@@ -15,6 +15,15 @@ Android app that lets you track any MangaDex manga and sends a local notificatio
 - Toggle to pause/resume background polling
 - Zero cost: no server, no cloud functions, no subscriptions
 
+## Screenshots
+
+<p align="center">
+  <img src="images/oping_home_screen.jpeg" alt="OPing home screen" width="250"/>
+  <img src="images/oping_search_screen.jpeg" alt="OPing search screen" width="250"/>
+  <img src="images/manga_example.jpeg" alt="Manga details" width="250"/>
+  <img src="images/chapter_example.jpeg" alt="Chapter reader" width="250"/>
+</p>
+
 ## Requirements
 
 - Android 8.0+ (API 26)
